@@ -1,29 +1,57 @@
 // script.js
 
-// Initialize icons
+// --------------------------------------------------------
+// 1. FIREBASE SETUP
+// --------------------------------------------------------
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+// !!! PASTE YOUR FIREBASE CONFIG HERE !!!
+// It should look like this: const firebaseConfig = { apiKey: "...", ... };
+const firebaseConfig = {
+    apiKey: "AIzaSy...",
+    authDomain: "...",
+    databaseURL: "https://...",
+    projectId: "...",
+    storageBucket: "...",
+    messagingSenderId: "...",
+    appId: "..."
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// Initialize Icons
 feather.replace();
 
-// Logic for checking scores
+// --------------------------------------------------------
+// 2. APP LOGIC
+// --------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
     const matchBlocks = document.querySelectorAll('.match-block');
 
-    matchBlocks.forEach(block => {
+    matchBlocks.forEach((block, index) => {
         const homeInput = block.querySelector('.score-home');
         const awayInput = block.querySelector('.score-away');
         const bets = block.querySelectorAll('.bet-value');
+        
+        // Create a unique ID for this match based on its order (match_0, match_1, etc.)
+        const matchId = `match_${index}`;
 
-        const checkBets = () => {
-            const homeVal = Number(homeInput.value); // Convert to number for comparison
-            const awayVal = Number(awayInput.value);
-            
-            // Check if inputs are empty strings (because Number('') is 0, which is a valid score)
-            if (homeInput.value === '' || awayInput.value === '') {
-                bets.forEach(bet => {
-                    bet.classList.remove('bg-green-700', 'text-white', 'font-bold', 'bg-green-300');
-                    bet.classList.add('bg-white'); 
-                });
-                return;
-            }
+        // FUNCTION: Calculate Colors (Same as before)
+        const checkBets = (hVal, aVal) => {
+            // Remove all colors first
+            bets.forEach(bet => {
+                bet.classList.remove('bg-green-700', 'text-white', 'font-bold', 'bg-green-300');
+                bet.classList.add('bg-white');
+            });
+
+            // If empty, stop
+            if (hVal === '' || aVal === '') return;
+
+            const homeScore = Number(hVal);
+            const awayScore = Number(aVal);
 
             bets.forEach(bet => {
                 const betText = bet.innerText.trim();
@@ -31,30 +59,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 const betHome = Number(betHomeStr);
                 const betAway = Number(betAwayStr);
 
-                // 1. EXACT SCORE (Bullseye) -> Dark Green
-                if (betHome === homeVal && betAway === awayVal) {
+                // Exact Score
+                if (betHome === homeScore && betAway === awayScore) {
                     bet.classList.remove('bg-white', 'bg-green-300');
                     bet.classList.add('bg-green-700', 'text-white', 'font-bold');
                 }
-                // 2. CORRECT DIRECTION (Winner/Draw) -> Light Green
-                // Check if Home Won in both, Away Won in both, or Draw in both
+                // Correct Direction
                 else if (
-                    (betHome > betAway && homeVal > awayVal) || // Home wins
-                    (betHome < betAway && homeVal < awayVal) || // Away wins
-                    (betHome === betAway && homeVal === awayVal) // Draw
+                    (betHome > betAway && homeScore > awayScore) ||
+                    (betHome < betAway && homeScore < awayScore) ||
+                    (betHome === betAway && homeScore === awayScore)
                 ) {
                     bet.classList.remove('bg-white', 'bg-green-700', 'text-white');
-                    bet.classList.add('bg-green-300', 'font-bold'); // Removed text-white for light green so text is readable
-                }
-                // 3. NO MATCH -> White
-                else {
-                    bet.classList.remove('bg-green-700', 'text-white', 'font-bold', 'bg-green-300');
-                    bet.classList.add('bg-white');
+                    bet.classList.add('bg-green-300', 'font-bold');
                 }
             });
         };
 
-        homeInput.addEventListener('input', checkBets);
-        awayInput.addEventListener('input', checkBets);
+        // LISTENER: When YOU type, send to Database
+        const sendToDb = () => {
+            set(ref(db, 'scores/' + matchId), {
+                home: homeInput.value,
+                away: awayInput.value
+            });
+        };
+
+        homeInput.addEventListener('input', sendToDb);
+        awayInput.addEventListener('input', sendToDb);
+
+        // LISTENER: When DATABASE changes (friend types), update screen
+        onValue(ref(db, 'scores/' + matchId), (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                homeInput.value = data.home;
+                awayInput.value = data.away;
+                checkBets(data.home, data.away);
+            }
+        });
     });
 });
