@@ -9,13 +9,13 @@ import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebase
 // !!! PASTE YOUR FIREBASE CONFIG HERE !!!
 // It should look like this: const firebaseConfig = { apiKey: "...", ... };
 const firebaseConfig = {
-    apiKey: "AIzaSy...",
-    authDomain: "...",
-    databaseURL: "https://...",
-    projectId: "...",
-    storageBucket: "...",
-    messagingSenderId: "...",
-    appId: "..."
+  apiKey: "AIzaSyCICNrNm1pxT3FjAHQPRCtXM-ei63dT8yY",
+  authDomain: "ucl-bets.firebaseapp.com",
+  databaseURL: "https://ucl-bets-default-rtdb.firebaseio.com",
+  projectId: "ucl-bets",
+  storageBucket: "ucl-bets.firebasestorage.app",
+  messagingSenderId: "520474072792",
+  appId: "1:520474072792:web:0beb13263d2b9a03d0a9ad"
 };
 
 // Initialize Firebase
