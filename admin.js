@@ -114,6 +114,64 @@ function renderGamesList() {
 }
 
 // ------------------------------------------------------------------
+// 2.1. MANAGE BONUS QUESTIONS
+// ------------------------------------------------------------------
+const bonusInput = document.getElementById('bonus-question');
+const addBonusBtn = document.getElementById('add-bonus-btn');
+const bonusList = document.getElementById('bonus-list');
+let bonusData = {};
+
+// Listen to Bonus Data
+onValue(ref(db, 'bonus_questions'), snapshot => {
+    bonusData = snapshot.val() || {};
+    renderBonusList();
+});
+
+addBonusBtn.addEventListener('click', () => {
+    const question = bonusInput.value.trim();
+    if (!question) return alert("יש להזין שאלה");
+
+    set(push(ref(db, 'bonus_questions')), {
+        question: question,
+        timestamp: Date.now()
+    });
+    bonusInput.value = '';
+    bonusInput.focus();
+});
+
+function renderBonusList() {
+    bonusList.innerHTML = '';
+    if (!bonusData) {
+        bonusList.innerHTML = '<div class="text-center text-gray-400 p-4">אין שאלות בונוס</div>';
+        return;
+    }
+
+    Object.keys(bonusData).forEach(key => {
+        const item = bonusData[key];
+        const div = document.createElement('div');
+        div.className = "flex justify-between items-center bg-gray-50 p-3 rounded border border-gray-100";
+        div.innerHTML = `
+            <span class="font-bold text-gray-700 text-sm">${item.question}</span>
+            <button class="delete-bonus text-red-400 hover:text-red-600 p-1" data-id="${key}">
+                <i data-feather="trash-2" class="w-4 h-4"></i>
+            </button>
+        `;
+        bonusList.appendChild(div);
+    });
+    feather.replace();
+
+    document.querySelectorAll('.delete-bonus').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.dataset.id;
+            if(confirm("למחוק שאלת בונוס זו?")) {
+                remove(ref(db, `bonus_questions/${id}`));
+                remove(ref(db, `bonus_bets/${id}`)); // Delete associated bets
+            }
+        });
+    });
+}
+
+// ------------------------------------------------------------------
 // 3. ARCHIVE ROUND (AUTOMATIC)
 // ------------------------------------------------------------------
 document.getElementById('archive-round-btn').addEventListener('click', () => {
