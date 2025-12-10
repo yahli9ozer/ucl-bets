@@ -21,16 +21,20 @@ let usersData = {};
 let gamesData = {};
 let scoresData = {};
 let betsData = {};
+let historyData = {};
 
 // DATA LISTENERS
 onValue(ref(db, 'users'), snapshot => {
     usersData = snapshot.val() || {};
-    renderUsersList();       // Regular user list
-    renderManualEntryForm(); // NEW: Form for retro input
+    renderUsersList();
 });
 onValue(ref(db, 'games'), snapshot => { gamesData = snapshot.val() || {}; renderGamesList(); });
 onValue(ref(db, 'scores'), snapshot => scoresData = snapshot.val() || {});
 onValue(ref(db, 'bets'), snapshot => betsData = snapshot.val() || {});
+onValue(ref(db, 'history'), snapshot => {
+    historyData = snapshot.val() || {};
+    renderHistoryList();
+});
 
 // ------------------------------------------------------------------
 // 1. MANAGE USERS
@@ -118,6 +122,7 @@ document.getElementById('archive-round-btn').addEventListener('click', () => {
     if (!confirm(`לשמור את "${name}"?`)) return;
 
     const results = {};
+    // Init all users with 0
     Object.keys(usersData).forEach(uid => results[uid] = 0);
 
     Object.keys(gamesData).forEach(gid => {
@@ -132,6 +137,7 @@ document.getElementById('archive-round-btn').addEventListener('click', () => {
 
     push(ref(db, 'history'), { name, timestamp: Date.now(), results });
     alert("נשמר!");
+    document.getElementById('round-name').value = '';
 });
 
 function getPoints(rH, rA, bH, bA) {
@@ -142,46 +148,65 @@ function getPoints(rH, rA, bH, bA) {
 }
 
 // ------------------------------------------------------------------
-// 4. MANUAL HISTORY ENTRY (NEW!)
+// 4. MANUAL HISTORY ENTRY (NEW LOGIC)
 // ------------------------------------------------------------------
-function renderManualEntryForm() {
-    const container = document.getElementById('manual-users-list');
-    if (!container) return; // In case specific HTML element missing
-    container.innerHTML = '';
+const manualRowsContainer = document.getElementById('manual-rows-container');
 
+// Function to add a single row
+function addManualRow() {
+    const div = document.createElement('div');
+    div.className = "flex items-center gap-2 manual-row animate-fade-in";
+    
+    // Create Select Options from usersData
+    let options = '<option value="">בחר שחקן...</option>';
     Object.keys(usersData).forEach(uid => {
-        const u = usersData[uid];
-        const div = document.createElement('div');
-        div.className = "flex items-center gap-2 bg-gray-50 p-2 rounded";
-        div.innerHTML = `
-            <label class="text-sm font-bold text-gray-700 w-20 truncate">${u.name}</label>
-            <input type="number" class="manual-score-input w-full border rounded p-1 text-center" 
-                   data-uid="${uid}" placeholder="נק'">
-        `;
-        container.appendChild(div);
+        options += `<option value="${uid}">${usersData[uid].name}</option>`;
     });
+
+    div.innerHTML = `
+        <select class="manual-user-select flex-1 p-2 border rounded bg-white text-sm">
+            ${options}
+        </select>
+        <input type="number" class="manual-score-input w-20 p-2 border rounded text-center" placeholder="ניקוד">
+        <button class="remove-row-btn text-red-400 hover:text-red-600">
+            <i data-feather="trash-2" class="w-4 h-4"></i>
+        </button>
+    `;
+
+    // Remove row logic
+    div.querySelector('.remove-row-btn').addEventListener('click', () => {
+        div.remove();
+    });
+
+    manualRowsContainer.appendChild(div);
+    feather.replace();
 }
 
+// Add initial row and Listen to Add Button
+document.getElementById('add-manual-row-btn').addEventListener('click', addManualRow);
+
+// Save Manual Round
 document.getElementById('save-manual-round-btn').addEventListener('click', () => {
     const name = document.getElementById('manual-round-name').value.trim();
     if (!name) return alert("חובה להזין שם למחזור");
 
+    const rows = document.querySelectorAll('.manual-row');
+    if (rows.length === 0) return alert("יש להוסיף לפחות שחקן אחד");
+
     const results = {};
     let hasData = false;
 
-    document.querySelectorAll('.manual-score-input').forEach(input => {
-        const val = input.value.trim();
-        if (val !== '') {
-            results[input.dataset.uid] = Number(val);
+    rows.forEach(row => {
+        const uid = row.querySelector('.manual-user-select').value;
+        const score = row.querySelector('.manual-score-input').value;
+
+        if (uid && score !== '') {
+            results[uid] = Number(score);
             hasData = true;
-        } else {
-            // Optional: Save as 0 or simply don't save. 
-            // If we want them to appear in the table with 0, we should save 0.
-            results[input.dataset.uid] = 0; 
         }
     });
 
-    if (!hasData) return alert("לא הוזנו נקודות לאף משתתף");
+    if (!hasData) return alert("נא למלא שחקן וניקוד תקינים");
 
     push(ref(db, 'history'), {
         name: name,
@@ -191,13 +216,58 @@ document.getElementById('save-manual-round-btn').addEventListener('click', () =>
 
     alert("המחזור הידני נשמר בהצלחה!");
     document.getElementById('manual-round-name').value = '';
-    document.querySelectorAll('.manual-score-input').forEach(i => i.value = '');
+    manualRowsContainer.innerHTML = ''; // Clear rows
 });
+
+
+// ------------------------------------------------------------------
+// 5. MANAGE SAVED HISTORY (NEW LOGIC)
+// ------------------------------------------------------------------
+function renderHistoryList() {
+    const list = document.getElementById('history-management-list');
+    list.innerHTML = '';
+
+    if (!historyData) {
+        list.innerHTML = '<li class="text-gray-400 text-center text-sm">אין היסטוריה שמורה</li>';
+        return;
+    }
+
+    // Sort by timestamp desc
+    const sortedKeys = Object.keys(historyData).sort((a,b) => historyData[b].timestamp - historyData[a].timestamp);
+
+    sortedKeys.forEach(key => {
+        const item = historyData[key];
+        const date = new Date(item.timestamp).toLocaleDateString('he-IL');
+        
+        const li = document.createElement('li');
+        li.className = "flex justify-between items-center bg-white p-3 rounded shadow-sm border border-gray-100 hover:bg-gray-50";
+        li.innerHTML = `
+            <div>
+                <span class="font-bold text-gray-800 block">${item.name}</span>
+                <span class="text-xs text-gray-400">${date}</span>
+            </div>
+            <button class="delete-history-btn text-red-400 hover:text-red-600 bg-red-50 p-2 rounded-full transition" data-id="${key}">
+                <i data-feather="trash-2" class="w-4 h-4"></i>
+            </button>
+        `;
+        list.appendChild(li);
+    });
+    feather.replace();
+
+    document.querySelectorAll('.delete-history-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.dataset.id;
+            if (confirm("האם למחוק את המחזור הזה מההיסטוריה? (לא ניתן לשחזר)")) {
+                remove(ref(db, `history/${id}`));
+            }
+        });
+    });
+}
 
 // RESET
 document.getElementById('reset-day-btn').addEventListener('click', () => {
-    if(confirm("למחוק הכל?")) {
+    if(confirm("למחוק את נתוני היום הנוכחי (משחקים/הימורים)?\n(היסטוריה לא תימחק)")) {
         remove(ref(db, 'games')); remove(ref(db, 'scores')); remove(ref(db, 'bets'));
-        location.reload();
+        alert("בוצע");
     }
 });
