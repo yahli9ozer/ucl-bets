@@ -87,6 +87,30 @@
                     </button>
                 </div>
             </div>
+        
+        <div class="bg-white rounded-xl shadow-lg p-6 md:col-span-2 border-t-4 border-orange-500">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <i data-feather="clock" class="text-orange-600"></i> הוספת מחזור רטרואקטיבית (ידני)
+                </h2>
+                <p class="text-gray-500 text-sm mb-6">
+                    השתמש באזור זה כדי להזין תוצאות של מחזורים שכבר שוחקו בעבר.
+                    <br>הזן שם למחזור, ואת הניקוד לכל שחקן שהשתתף (השאר ריק למי שלא שיחק).
+                </p>
+                
+                <div class="mb-6">
+                    <label class="text-xs font-bold text-gray-400">שם המחזור (למשל: מחזור עבר 1)</label>
+                    <input type="text" id="manual-round-name" placeholder="הזן שם..." class="w-full p-2 border rounded mt-1 bg-orange-50">
+                </div>
+
+                <div id="manual-users-list" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    </div>
+
+                <div class="text-left">
+                    <button id="save-manual-round-btn" class="bg-orange-600 text-white px-6 py-2 rounded hover:bg-orange-700 font-bold shadow flex items-center gap-2 mr-auto">
+                        <i data-feather="save"></i> שמור מחזור עבר
+                    </button>
+                </div>
+            </div>
 
         <div class="mt-12 border-t border-slate-600 pt-8 text-center">
             <h3 class="text-slate-400 font-bold mb-4">אזור מסוכן</h3>
