@@ -385,3 +385,56 @@ function updateBonus(uid, change) {
         bonusPoints: currentBonus + change
     });
 }
+
+// -----------------------------------------------------------------------------
+// FALLING BACKGROUND ANIMATION
+// -----------------------------------------------------------------------------
+function createFallingBackground() {
+    const container = document.getElementById('falling-elements-container');
+    if (!container) return;
+
+    // רשימת התמונות שייפלו (ודא שהן קיימות בתיקיית assets)
+    const itemImages = [
+        'assets/item1.png', // למשל: חזייה כחולה
+        'assets/item2.png', // למשל: חזייה זהב
+        'assets/item3.png', // למשל: שטר דולר
+        'assets/item4.png'  // למשל: ערימת כסף
+    ];
+
+    function spawnItem() {
+        const item = document.createElement('img');
+        
+        // בחירה אקראית של תמונה
+        const randomImg = itemImages[Math.floor(Math.random() * itemImages.length)];
+        item.src = randomImg;
+        item.classList.add('falling-item');
+
+        // הגדרות אקראיות למיקום, גודל ומהירות
+        const startLeft = Math.random() * 100; // מיקום אופקי באחוזים
+        const size = Math.random() * 30 + 20; // גודל בין 20 ל-50 פיקסלים
+        const duration = Math.random() * 5 + 5; // משך נפילה בין 5 ל-10 שניות
+        const delay = Math.random() * 5; // דיליי התחלתי
+
+        item.style.left = `${startLeft}%`;
+        item.style.width = `${size}px`;
+        item.style.height = 'auto';
+        item.style.animationDuration = `${duration}s`;
+        item.style.animationDelay = `-${delay}s`; // התחלה מיידית בנקודה אקראית
+
+        container.appendChild(item);
+
+        // מחיקת האלמנט אחרי שהוא מסיים ליפול כדי לא להעמיס על הדפדפן
+        setTimeout(() => {
+            item.remove();
+        }, (duration + delay) * 1000);
+    }
+
+    // יצירת פריט חדש כל חצי שנייה
+    setInterval(spawnItem, 500);
+    
+    // יצירה ראשונית של הרבה פריטים למילוי המסך
+    for(let i=0; i<15; i++) spawnItem();
+}
+
+// הפעלת האנימציה בטעינת הדף
+document.addEventListener('DOMContentLoaded', createFallingBackground);
