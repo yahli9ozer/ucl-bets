@@ -21,23 +21,23 @@ let usersData = {};
 let gamesData = {};
 let scoresData = {};
 let betsData = {};
+let bonusData = {};
 let historyData = {};
 
 // DATA LISTENERS
 onValue(ref(db, 'users'), snapshot => {
     usersData = snapshot.val() || {};
-    renderUsersList();
+    renderUsersList();       
+    renderManualEntryForm(); 
 });
 onValue(ref(db, 'games'), snapshot => { gamesData = snapshot.val() || {}; renderGamesList(); });
 onValue(ref(db, 'scores'), snapshot => scoresData = snapshot.val() || {});
 onValue(ref(db, 'bets'), snapshot => betsData = snapshot.val() || {});
-onValue(ref(db, 'history'), snapshot => {
-    historyData = snapshot.val() || {};
-    renderHistoryList();
-});
+onValue(ref(db, 'bonus_questions'), snapshot => { bonusData = snapshot.val() || {}; renderBonusList(); });
+onValue(ref(db, 'history'), snapshot => { historyData = snapshot.val() || {}; renderHistoryList(); });
 
 // ------------------------------------------------------------------
-// 1. MANAGE USERS
+// 1. MANAGE USERS (UPDATED WITH PASSWORD CHANGE)
 // ------------------------------------------------------------------
 const userNameIn = document.getElementById('user-name');
 const userPassIn = document.getElementById('user-pass');
@@ -53,20 +53,62 @@ document.getElementById('add-user-btn').addEventListener('click', () => {
 function renderUsersList() {
     const list = document.getElementById('users-list');
     list.innerHTML = '';
-    if (!usersData) return;
+    if (!usersData) {
+        list.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-400">אין משתתפים רשומים</td></tr>';
+        return;
+    }
 
     Object.keys(usersData).forEach(key => {
         const u = usersData[key];
         const row = document.createElement('tr');
+        row.className = "hover:bg-gray-50 border-b last:border-0";
+        
+        // New structure: Password is an Input field with a Save button
         row.innerHTML = `
-            <td class="p-2 font-medium">${u.name}</td>
-            <td class="p-2 font-mono text-gray-500">${u.password}</td>
-            <td class="p-2 text-center"><button class="del-usr text-red-400" data-id="${key}">X</button></td>`;
+            <td class="p-3 font-bold text-gray-700">${u.name}</td>
+            <td class="p-3">
+                <div class="flex items-center gap-2">
+                    <input type="text" class="pass-input border border-gray-300 rounded px-2 py-1 w-24 text-sm font-mono text-gray-600 focus:border-blue-500 focus:text-black outline-none transition" 
+                           value="${u.password}" id="pass-${key}">
+                    
+                    <button class="save-pass-btn text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 p-1.5 rounded transition" 
+                            data-id="${key}" title="שמור סיסמה חדשה">
+                        <i data-feather="check" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </td>
+            <td class="p-3 text-center">
+                <button class="del-usr text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded transition" data-id="${key}" title="מחק משתמש">
+                    <i data-feather="trash-2" class="w-4 h-4"></i>
+                </button>
+            </td>`;
         list.appendChild(row);
     });
+    feather.replace();
     
-    document.querySelectorAll('.del-usr').forEach(b => b.addEventListener('click', e => {
-        if(confirm("למחוק?")) remove(ref(db, `users/${e.target.dataset.id}`));
+    // Event: Delete User
+    document.querySelectorAll('.del-usr').forEach(btn => btn.addEventListener('click', e => {
+        if(confirm("למחוק את המשתמש?")) remove(ref(db, `users/${e.currentTarget.dataset.id}`));
+    }));
+
+    // Event: Update Password (NEW)
+    document.querySelectorAll('.save-pass-btn').forEach(btn => btn.addEventListener('click', e => {
+        const uid = e.currentTarget.dataset.id;
+        const newPass = document.getElementById(`pass-${uid}`).value.trim();
+        
+        if(newPass) {
+            update(ref(db, `users/${uid}`), { password: newPass })
+                .then(() => {
+                    // Visual feedback
+                    const btnIcon = e.currentTarget.querySelector('svg'); // feather icon
+                    e.currentTarget.classList.add('bg-green-100', 'text-green-600');
+                    setTimeout(() => {
+                        e.currentTarget.classList.remove('bg-green-100', 'text-green-600');
+                    }, 1000);
+                });
+        } else {
+            alert("סיסמה לא יכולה להיות ריקה");
+        }
     }));
 }
 
@@ -87,92 +129,77 @@ document.getElementById('add-game-btn').addEventListener('click', () => {
 function renderGamesList() {
     const list = document.getElementById('games-list');
     list.innerHTML = '';
-    if(!gamesData) return;
+    if(!gamesData) {
+        list.innerHTML = '<div class="text-center text-gray-400 p-4">אין משחקים פעילים</div>';
+        return;
+    }
 
     Object.keys(gamesData).forEach(key => {
         const g = gamesData[key];
         const div = document.createElement('div');
-        div.className = "flex justify-between p-2 bg-gray-50 border rounded mb-2";
+        div.className = "flex justify-between items-center bg-gray-50 p-3 rounded border border-gray-100";
         div.innerHTML = `
-            <span>${g.home} - ${g.away} ${g.started ? '✅' : ''}</span>
-            <div>
-                ${!g.started ? `<button class="start-game text-green-600 mr-2" data-id="${key}">התחל</button>` : ''}
-                <button class="del-game text-red-500" data-id="${key}">מחק</button>
-            </div>`;
+            <div class="flex items-center gap-3">
+                <span class="font-bold text-gray-700">${g.home} - ${g.away}</span>
+                ${g.started ? 
+                    `<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1"><i data-feather="check" class="w-3 h-3"></i> פעיל</span>` : 
+                    `<button class="start-game text-green-600 border border-green-200 bg-white px-3 py-1 rounded text-xs hover:bg-green-50 font-bold" data-id="${key}">התחל</button>`}
+            </div>
+            <button class="del-game text-red-400 hover:text-red-600 p-1" data-id="${key}"><i data-feather="trash-2" class="w-4 h-4"></i></button>`;
         list.appendChild(div);
     });
+    feather.replace();
 
     document.querySelectorAll('.start-game').forEach(b => b.addEventListener('click', e => {
-        update(ref(db, `games/${e.target.dataset.id}`), { started: true });
+        update(ref(db, `games/${e.currentTarget.dataset.id}`), { started: true });
     }));
     document.querySelectorAll('.del-game').forEach(b => b.addEventListener('click', e => {
         if(confirm("למחוק משחק?")) {
-            const id = e.target.dataset.id;
+            const id = e.currentTarget.dataset.id;
             remove(ref(db, `games/${id}`)); remove(ref(db, `scores/${id}`)); remove(ref(db, `bets/${id}`));
         }
     }));
 }
 
 // ------------------------------------------------------------------
-// 2.1. MANAGE BONUS QUESTIONS
+// 3. BONUS QUESTIONS
 // ------------------------------------------------------------------
 const bonusInput = document.getElementById('bonus-question');
-const addBonusBtn = document.getElementById('add-bonus-btn');
 const bonusList = document.getElementById('bonus-list');
-let bonusData = {};
 
-// Listen to Bonus Data
-onValue(ref(db, 'bonus_questions'), snapshot => {
-    bonusData = snapshot.val() || {};
-    renderBonusList();
-});
-
-addBonusBtn.addEventListener('click', () => {
-    const question = bonusInput.value.trim();
-    if (!question) return alert("יש להזין שאלה");
-
-    set(push(ref(db, 'bonus_questions')), {
-        question: question,
-        timestamp: Date.now()
-    });
-    bonusInput.value = '';
-    bonusInput.focus();
+document.getElementById('add-bonus-btn').addEventListener('click', () => {
+    const q = bonusInput.value.trim();
+    if(!q) return;
+    set(push(ref(db, 'bonus_questions')), { question: q });
+    bonusInput.value = ''; bonusInput.focus();
 });
 
 function renderBonusList() {
     bonusList.innerHTML = '';
-    if (!bonusData) {
-        bonusList.innerHTML = '<div class="text-center text-gray-400 p-4">אין שאלות בונוס</div>';
+    if(!bonusData) {
+        bonusList.innerHTML = '<div class="text-center text-gray-400 p-4 text-xs">אין שאלות בונוס</div>';
         return;
     }
-
     Object.keys(bonusData).forEach(key => {
         const item = bonusData[key];
         const div = document.createElement('div');
-        div.className = "flex justify-between items-center bg-gray-50 p-3 rounded border border-gray-100";
+        div.className = "flex justify-between items-center bg-yellow-50/50 p-2 rounded border border-yellow-100";
         div.innerHTML = `
             <span class="font-bold text-gray-700 text-sm">${item.question}</span>
-            <button class="delete-bonus text-red-400 hover:text-red-600 p-1" data-id="${key}">
-                <i data-feather="trash-2" class="w-4 h-4"></i>
-            </button>
-        `;
+            <button class="del-bonus text-red-400 hover:text-red-600 p-1" data-id="${key}"><i data-feather="trash-2" class="w-4 h-4"></i></button>`;
         bonusList.appendChild(div);
     });
     feather.replace();
-
-    document.querySelectorAll('.delete-bonus').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+    document.querySelectorAll('.del-bonus').forEach(b => b.addEventListener('click', e => {
+        if(confirm("למחוק?")) {
             const id = e.currentTarget.dataset.id;
-            if(confirm("למחוק שאלת בונוס זו?")) {
-                remove(ref(db, `bonus_questions/${id}`));
-                remove(ref(db, `bonus_bets/${id}`)); // Delete associated bets
-            }
-        });
-    });
+            remove(ref(db, `bonus_questions/${id}`)); remove(ref(db, `bonus_bets/${id}`));
+        }
+    }));
 }
 
 // ------------------------------------------------------------------
-// 3. ARCHIVE ROUND (AUTOMATIC)
+// 4. ARCHIVE ROUND
 // ------------------------------------------------------------------
 document.getElementById('archive-round-btn').addEventListener('click', () => {
     const name = document.getElementById('round-name').value.trim();
@@ -180,8 +207,7 @@ document.getElementById('archive-round-btn').addEventListener('click', () => {
     if (!confirm(`לשמור את "${name}"?`)) return;
 
     const results = {};
-    // Init all users with 0
-    Object.keys(usersData).forEach(uid => results[uid] = 0);
+    Object.keys(usersData).forEach(uid => results[uid] = usersData[uid].bonusPoints || 0); // Start with bonus points
 
     Object.keys(gamesData).forEach(gid => {
         const score = scoresData[gid];
@@ -206,126 +232,86 @@ function getPoints(rH, rA, bH, bA) {
 }
 
 // ------------------------------------------------------------------
-// 4. MANUAL HISTORY ENTRY (NEW LOGIC)
+// 5. MANUAL HISTORY & LIST
 // ------------------------------------------------------------------
 const manualRowsContainer = document.getElementById('manual-rows-container');
 
-// Function to add a single row
-function addManualRow() {
-    const div = document.createElement('div');
-    div.className = "flex items-center gap-2 manual-row animate-fade-in";
-    
-    // Create Select Options from usersData
-    let options = '<option value="">בחר שחקן...</option>';
+function renderManualEntryForm() {
+    manualRowsContainer.innerHTML = '';
+    if(!usersData) return;
     Object.keys(usersData).forEach(uid => {
-        options += `<option value="${uid}">${usersData[uid].name}</option>`;
+        addManualRow(); // Logic for dynamic rows is better handled by button, but here we can populate defaults
     });
-
+}
+// Add row manually
+document.getElementById('add-manual-row-btn').addEventListener('click', () => {
+    const div = document.createElement('div');
+    div.className = "flex items-center gap-2 manual-row animate-fade-in mb-2";
+    let options = '<option value="">בחר שחקן...</option>';
+    if(usersData) Object.keys(usersData).forEach(uid => options += `<option value="${uid}">${usersData[uid].name}</option>`);
+    
     div.innerHTML = `
-        <select class="manual-user-select flex-1 p-2 border rounded bg-white text-sm">
-            ${options}
-        </select>
-        <input type="number" class="manual-score-input w-20 p-2 border rounded text-center" placeholder="ניקוד">
-        <button class="remove-row-btn text-red-400 hover:text-red-600">
-            <i data-feather="trash-2" class="w-4 h-4"></i>
-        </button>
-    `;
-
-    // Remove row logic
-    div.querySelector('.remove-row-btn').addEventListener('click', () => {
-        div.remove();
-    });
-
+        <select class="manual-user-select flex-1 p-2 border rounded bg-white text-sm">${options}</select>
+        <input type="number" class="manual-score-input w-20 p-2 border rounded text-center" placeholder="נק'">
+        <button class="rm-row text-red-400 hover:text-red-600"><i data-feather="trash-2" class="w-4 h-4"></i></button>`;
+    
+    div.querySelector('.rm-row').addEventListener('click', () => div.remove());
     manualRowsContainer.appendChild(div);
     feather.replace();
-}
+});
 
-// Add initial row and Listen to Add Button
-document.getElementById('add-manual-row-btn').addEventListener('click', addManualRow);
-
-// Save Manual Round
 document.getElementById('save-manual-round-btn').addEventListener('click', () => {
     const name = document.getElementById('manual-round-name').value.trim();
-    if (!name) return alert("חובה להזין שם למחזור");
-
+    if (!name) return alert("שם מחזור חובה");
     const rows = document.querySelectorAll('.manual-row');
-    if (rows.length === 0) return alert("יש להוסיף לפחות שחקן אחד");
+    if (rows.length === 0) return alert("הוסף שחקנים");
 
     const results = {};
-    let hasData = false;
-
     rows.forEach(row => {
         const uid = row.querySelector('.manual-user-select').value;
         const score = row.querySelector('.manual-score-input').value;
-
-        if (uid && score !== '') {
-            results[uid] = Number(score);
-            hasData = true;
-        }
+        if(uid && score !== '') results[uid] = Number(score);
     });
 
-    if (!hasData) return alert("נא למלא שחקן וניקוד תקינים");
-
-    push(ref(db, 'history'), {
-        name: name,
-        timestamp: Date.now(),
-        results: results
-    });
-
-    alert("המחזור הידני נשמר בהצלחה!");
+    push(ref(db, 'history'), { name, timestamp: Date.now(), results });
+    alert("נשמר!");
     document.getElementById('manual-round-name').value = '';
-    manualRowsContainer.innerHTML = ''; // Clear rows
+    manualRowsContainer.innerHTML = '';
 });
 
-
-// ------------------------------------------------------------------
-// 5. MANAGE SAVED HISTORY (NEW LOGIC)
-// ------------------------------------------------------------------
 function renderHistoryList() {
     const list = document.getElementById('history-management-list');
     list.innerHTML = '';
-
     if (!historyData) {
-        list.innerHTML = '<li class="text-gray-400 text-center text-sm">אין היסטוריה שמורה</li>';
+        list.innerHTML = '<li class="text-gray-400 text-center text-sm p-2">אין היסטוריה</li>';
         return;
     }
-
-    // Sort by timestamp desc
     const sortedKeys = Object.keys(historyData).sort((a,b) => historyData[b].timestamp - historyData[a].timestamp);
-
     sortedKeys.forEach(key => {
         const item = historyData[key];
         const date = new Date(item.timestamp).toLocaleDateString('he-IL');
-        
         const li = document.createElement('li');
         li.className = "flex justify-between items-center bg-white p-3 rounded shadow-sm border border-gray-100 hover:bg-gray-50";
         li.innerHTML = `
-            <div>
-                <span class="font-bold text-gray-800 block">${item.name}</span>
-                <span class="text-xs text-gray-400">${date}</span>
-            </div>
-            <button class="delete-history-btn text-red-400 hover:text-red-600 bg-red-50 p-2 rounded-full transition" data-id="${key}">
-                <i data-feather="trash-2" class="w-4 h-4"></i>
-            </button>
-        `;
+            <div><span class="font-bold text-gray-800 block">${item.name}</span><span class="text-xs text-gray-400">${date}</span></div>
+            <button class="del-hist text-red-400 hover:text-red-600 bg-red-50 p-2 rounded-full" data-id="${key}"><i data-feather="trash-2" class="w-4 h-4"></i></button>`;
         list.appendChild(li);
     });
     feather.replace();
-
-    document.querySelectorAll('.delete-history-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = e.currentTarget.dataset.id;
-            if (confirm("האם למחוק את המחזור הזה מההיסטוריה? (לא ניתן לשחזר)")) {
-                remove(ref(db, `history/${id}`));
-            }
-        });
-    });
+    document.querySelectorAll('.del-hist').forEach(b => b.addEventListener('click', e => {
+        if(confirm("למחוק מההיסטוריה?")) remove(ref(db, `history/${e.currentTarget.dataset.id}`));
+    }));
 }
 
 // RESET
 document.getElementById('reset-day-btn').addEventListener('click', () => {
-    if(confirm("למחוק את נתוני היום הנוכחי (משחקים/הימורים)?\n(היסטוריה לא תימחק)")) {
-        remove(ref(db, 'games')); remove(ref(db, 'scores')); remove(ref(db, 'bets'));
+    if(confirm("למחוק הכל מהיום (כולל בונוסים)?")) {
+        remove(ref(db, 'games')); remove(ref(db, 'scores')); remove(ref(db, 'bets')); 
+        remove(ref(db, 'bonus_questions')); remove(ref(db, 'bonus_bets'));
+        // Also reset bonus points for users
+        if(usersData) {
+            Object.keys(usersData).forEach(uid => update(ref(db, `users/${uid}`), { bonusPoints: 0 }));
+        }
         alert("בוצע");
     }
 });
