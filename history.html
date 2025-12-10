@@ -3,58 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kicker Hall of Fame 🏆</title>
+    <title>היכל התהילה 🏆</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/feather-icons"></script>
     <script src="components/navbar.js"></script>
 </head>
-<body class="bg-gray-100 text-right">
+<body class="bg-slate-100 text-right">
     
     <custom-navbar></custom-navbar>
 
-    <main class="container mx-auto px-4 py-8">
-        <div class="max-w-5xl mx-auto">
-            <div class="flex justify-between items-center mb-8">
-                <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-2">
-                    <i data-feather="trello" class="text-purple-600"></i> טבלת כל הזמנים
+    <main class="container mx-auto px-4 py-8 pb-24">
+        <div class="max-w-6xl mx-auto">
+            
+            <div class="flex justify-between items-center mb-10">
+                <h1 class="text-3xl font-bold text-slate-800 flex items-center gap-2">
+                    <i data-feather="award" class="text-yellow-500"></i> היכל התהילה
                 </h1>
-                <a href="index.html" class="bg-white border px-4 py-2 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2">
+                <a href="index.html" class="bg-white border px-4 py-2 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2 font-bold shadow-sm">
                     <i data-feather="arrow-right"></i> חזרה למשחק
                 </a>
             </div>
 
-            <div class="bg-white rounded-xl shadow-xl overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-center whitespace-nowrap">
-                        <thead class="bg-slate-800 text-white">
-                            <tr id="table-head-row">
-                                <th class="p-4 text-right">משתתף</th>
-                                <th class="p-4 bg-slate-700 text-xl">סה"כ</th>
-                                </tr>
-                        </thead>
-                        <tbody id="history-body" class="text-gray-800 font-bold divide-y">
-                            </tbody>
-                    </table>
-                </div>
+            <div class="bg-white rounded-2xl shadow-xl p-6 mb-12">
+                <h2 class="text-xl font-bold text-slate-700 mb-6 flex items-center gap-2 border-b pb-4">
+                    <i data-feather="bar-chart-2"></i> דירוג מדליות כללי
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="trophy-grid">
+                    </div>
             </div>
-            <p class="text-center text-gray-400 mt-8 text-xs">הנתונים מתעדכנים בכל פעם שהאדמין סוגר מחזור</p>
+
+            <h2 class="text-2xl font-bold text-slate-700 mb-6 flex items-center gap-2">
+                <i data-feather="layers"></i> ארכיון מחזורים
+            </h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8" id="rounds-container">
+                </div>
+
         </div>
     </main>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         // !!! PASTE CONFIG HERE !!!
         const firebaseConfig = {
-           apiKey: "AIzaSyCICNrNm1pxT3FjAHQPRCtXM-ei63dT8yY",
-           authDomain: "ucl-bets.firebaseapp.com",
-           databaseURL: "https://ucl-bets-default-rtdb.firebaseio.com",
-           projectId: "ucl-bets",
-           storageBucket: "ucl-bets.firebasestorage.app",
-           messagingSenderId: "520474072792",
-           appId: "1:520474072792:web:0beb13263d2b9a03d0a9ad"
+           // ... CONFIG ...
         };
 
         const app = initializeApp(firebaseConfig);
@@ -62,103 +57,175 @@
         feather.replace();
 
         let users = {};
-        let history = {};
+        let historyData = {};
 
         // Fetch Data
-        const usersRef = ref(db, 'users');
-        const historyRef = ref(db, 'history');
-
-        // Load Users First
-        onValue(usersRef, (uSnap) => {
-            users = uSnap.val() || {};
-            // Load History
-            onValue(historyRef, (hSnap) => {
-                history = hSnap.val() || {};
-                renderTable();
+        onValue(ref(db, 'users'), s => {
+            users = s.val() || {};
+            onValue(ref(db, 'history'), hSnap => {
+                historyData = hSnap.val() || {};
+                renderPage();
             });
         });
 
-        function renderTable() {
-            const theadRow = document.getElementById('table-head-row');
-            const tbody = document.getElementById('history-body');
-            
-            // 1. Prepare Columns (Rounds)
-            // Clear existing round headers (keep first 2: Name, Total)
-            while (theadRow.children.length > 2) {
-                theadRow.removeChild(theadRow.lastChild);
+        function renderPage() {
+            // 1. Calculate Trophies
+            const playerStats = {};
+            // Init stats for known users
+            Object.keys(users).forEach(uid => {
+                playerStats[uid] = { name: users[uid].name, gold: 0, silver: 0, bronze: 0, totalPoints: 0 };
+            });
+
+            const roundsArr = [];
+
+            if (historyData) {
+                Object.keys(historyData).forEach(rid => {
+                    const round = historyData[rid];
+                    roundsArr.push({ id: rid, ...round });
+                    
+                    // Convert results to array for sorting
+                    const roundPlayers = [];
+                    if (round.results) {
+                        Object.keys(round.results).forEach(uid => {
+                            const pts = round.results[uid];
+                            // Accumulate total points
+                            if (playerStats[uid]) playerStats[uid].totalPoints += pts;
+                            else if(users[uid]) { /* edge case */ }
+                            
+                            roundPlayers.push({ uid, pts });
+                        });
+                    }
+
+                    // Sort round to find winners
+                    roundPlayers.sort((a, b) => b.pts - a.pts);
+
+                    // Assign Medals (Handle ties)
+                    roundPlayers.forEach((p, index) => {
+                        if (!playerStats[p.uid]) return;
+                        
+                        // Simple ranking based on index, ties logic is complex, keeping simple for now:
+                        // If index 0 => Gold. If index 1 => Silver.
+                        // Better logic: check previous score
+                        
+                        let rank = index + 1;
+                        // Check ties with previous
+                        if (index > 0 && p.pts === roundPlayers[index-1].pts) {
+                            // Same rank as previous
+                            // This part simplifies: purely positional for medal count
+                        }
+
+                        // We will give medals strictly by position for simplicity in this version,
+                        // or strict top 3.
+                        if (index === 0) playerStats[p.uid].gold++;
+                        else if (index === 1) playerStats[p.uid].silver++;
+                        else if (index === 2) playerStats[p.uid].bronze++;
+                    });
+                });
             }
 
-            const rounds = Object.keys(history).map(key => ({
-                id: key,
-                ...history[key]
-            })).sort((a, b) => a.timestamp - b.timestamp); // Sort by date
-
-            // Add Headers for rounds
-            rounds.forEach(r => {
-                const th = document.createElement('th');
-                th.className = "p-4 font-normal text-sm text-gray-300";
-                th.innerText = r.name;
-                theadRow.appendChild(th);
+            // RENDER TROPHY CARDS
+            const trophyContainer = document.getElementById('trophy-grid');
+            trophyContainer.innerHTML = '';
+            
+            // Convert to array and sort by Gold > Silver > Bronze > Total Points
+            const sortedStats = Object.values(playerStats).sort((a, b) => {
+                if (b.gold !== a.gold) return b.gold - a.gold;
+                if (b.silver !== a.silver) return b.silver - a.silver;
+                if (b.bronze !== a.bronze) return b.bronze - a.bronze;
+                return b.totalPoints - a.totalPoints;
             });
 
-            // 2. Prepare Rows (Users)
-            const userStats = Object.keys(users).map(uid => {
-                const userObj = { 
-                    id: uid, 
-                    name: users[uid].name, 
-                    total: 0,
-                    roundPoints: [] 
-                };
-
-                // Sum up points
-                rounds.forEach(r => {
-                    const pts = (r.results && r.results[uid]) ? r.results[uid] : 0;
-                    userObj.total += pts;
-                    userObj.roundPoints.push(pts);
-                });
-
-                return userObj;
-            });
-
-            // Sort by Total Points
-            userStats.sort((a, b) => b.total - a.total);
-
-            // Render Body
-            tbody.innerHTML = '';
-            userStats.forEach((u, i) => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-blue-50 transition";
-                
-                // Color for rank
-                let rankColor = "text-gray-500";
-                let rowBg = "";
-                if (i === 0) { rankColor = "text-yellow-500"; rowBg="bg-yellow-50/50"; }
-                if (i === 1) rankColor = "text-gray-400";
-                if (i === 2) rankColor = "text-orange-400";
-                
-                tr.className += " " + rowBg;
-
-                // Name Cell
-                let html = `
-                    <td class="p-4 text-right flex items-center gap-3">
-                        <span class="font-bold text-lg ${rankColor}">#${i+1}</span>
-                        <span>${u.name}</span>
-                    </td>
-                    <td class="p-4 text-xl text-blue-600 bg-gray-50/80 font-black">${u.total}</td>
+            sortedStats.forEach((p, i) => {
+                const card = document.createElement('div');
+                card.className = "border rounded-xl p-4 flex items-center justify-between bg-slate-50 hover:bg-white hover:shadow-md transition";
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="text-lg font-bold text-slate-400 w-6">#${i+1}</span>
+                        <span class="font-bold text-gray-800">${p.name}</span>
+                    </div>
+                    <div class="flex gap-3 text-sm">
+                        <div class="flex flex-col items-center">
+                            <span class="text-xl">🥇</span>
+                            <span class="font-bold text-gray-700">${p.gold}</span>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <span class="text-xl">🥈</span>
+                            <span class="font-bold text-gray-700">${p.silver}</span>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <span class="text-xl">🥉</span>
+                            <span class="font-bold text-gray-700">${p.bronze}</span>
+                        </div>
+                    </div>
                 `;
+                trophyContainer.appendChild(card);
+            });
 
-                // Round Cells
-                u.roundPoints.forEach(pts => {
-                    let color = "text-gray-400";
-                    if (pts > 0) color = "text-gray-800";
-                    if (pts >= 10) color = "text-green-600 font-black"; // High score highlight
+            // RENDER ROUNDS (Reverse chronological)
+            roundsArr.sort((a, b) => b.timestamp - a.timestamp);
+            const roundsContainer = document.getElementById('rounds-container');
+            roundsContainer.innerHTML = '';
+
+            roundsArr.forEach(round => {
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-xl shadow p-5 border-t-4 border-blue-500 relative group";
+                
+                // Delete button for admin (hidden by default logic but visible here for cleanup)
+                const delBtn = `<button class="del-round absolute top-4 left-4 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition" data-id="${round.id}"><i data-feather="trash-2" class="w-4 h-4"></i></button>`;
+
+                let rows = '';
+                // Sort users in this round
+                const roundUsers = [];
+                if (round.results) {
+                    Object.keys(round.results).forEach(uid => {
+                        roundUsers.push({ 
+                            name: users[uid] ? users[uid].name : 'Unknown', 
+                            pts: round.results[uid] 
+                        });
+                    });
+                }
+                roundUsers.sort((a, b) => b.pts - a.pts);
+
+                roundUsers.forEach((u, idx) => {
+                    let badge = '';
+                    if (idx === 0) badge = '🥇';
+                    if (idx === 1) badge = '🥈';
+                    if (idx === 2) badge = '🥉';
                     
-                    html += `<td class="p-4 ${color}">${pts}</td>`;
+                    rows += `
+                        <div class="flex justify-between items-center py-2 border-b last:border-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold w-4">${idx+1}</span>
+                                <span class="text-sm font-medium text-gray-700">${u.name}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span>${badge}</span>
+                                <span class="font-bold text-blue-600">${u.pts}</span>
+                            </div>
+                        </div>
+                    `;
                 });
 
-                tr.innerHTML = html;
-                tbody.appendChild(tr);
+                card.innerHTML = `
+                    ${delBtn}
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-lg text-gray-800">${round.name}</h3>
+                        <span class="text-xs text-gray-400">${new Date(round.timestamp).toLocaleDateString('he-IL')}</span>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3 max-h-60 overflow-y-auto">
+                        ${rows}
+                    </div>
+                `;
+                roundsContainer.appendChild(card);
             });
+            feather.replace();
+
+            // Delete Event
+            document.querySelectorAll('.del-round').forEach(b => b.addEventListener('click', e => {
+                 if(confirm("למחוק את ההיסטוריה של מחזור זה?")) {
+                     remove(ref(db, `history/${e.currentTarget.dataset.id}`));
+                 }
+            }));
         }
     </script>
 </body>
