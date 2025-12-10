@@ -403,7 +403,13 @@ function createFallingBackground() {
     const container = document.getElementById('falling-elements-container');
     if (!container) return;
 
-    const itemImages = ['assets/item1.png', 'assets/item2.png', 'assets/item3.png', 'assets/item4.png'];
+    const itemImages = [
+      'assets/item1.png',
+      'assets/item2.png',
+      'assets/item3.png',
+      'assets/item4.png',
+    'assets/item5.png',
+    'assets/item6.png'];
 
     function spawnItem() {
         const item = document.createElement('img');
