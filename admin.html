@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kicker Admin 🛡️</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body class="bg-slate-800 text-right min-h-screen">
+    
+    <nav class="bg-slate-900 text-white p-4 shadow-md mb-8">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+                <i data-feather="shield"></i> פאנל ניהול
+            </h1>
+            <a href="index.html" class="text-slate-400 hover:text-white text-sm underline">חזרה למשחק</a>
+        </div>
+    </nav>
+    
+    <main class="container mx-auto px-4 pb-12">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2">
+                    <i data-feather="users" class="text-blue-600"></i> ניהול משתתפים
+                </h2>
+                
+                <div class="flex gap-2 mb-6 bg-blue-50 p-3 rounded-lg">
+                    <input type="text" id="user-name" placeholder="שם משתתף" class="flex-1 p-2 border rounded text-sm focus:outline-blue-500">
+                    <input type="text" id="user-pass" placeholder="סיסמה" class="w-24 p-2 border rounded text-sm focus:outline-blue-500">
+                    <button id="add-user-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 font-bold shadow">
+                        <i data-feather="plus"></i>
+                    </button>
+                </div>
+
+                <div class="overflow-y-auto max-h-[400px]">
+                    <table class="w-full text-sm text-right">
+                        <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+                            <tr>
+                                <th class="p-2">שם</th>
+                                <th class="p-2">סיסמה</th>
+                                <th class="p-2 text-center">פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-list" class="divide-y">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2">
+                    <i data-feather="activity" class="text-green-600"></i> ניהול משחקים
+                </h2>
+
+                <div class="flex gap-2 mb-6 bg-green-50 p-3 rounded-lg">
+                    <input type="text" id="game-home" placeholder="קבוצת בית" class="flex-1 p-2 border rounded text-sm focus:outline-green-500">
+                    <span class="self-center font-bold text-gray-400">-</span>
+                    <input type="text" id="game-away" placeholder="קבוצת חוץ" class="flex-1 p-2 border rounded text-sm focus:outline-green-500">
+                    <button id="add-game-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 font-bold shadow">
+                        <i data-feather="plus"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-2" id="games-list">
+                    </div>
+            </div>
+        </div>
+
+        <div class="mt-12 border-t border-slate-600 pt-8 text-center">
+            <h3 class="text-slate-400 font-bold mb-4">אזור מסוכן</h3>
+            <button id="reset-day-btn" class="bg-red-500/20 text-red-400 border border-red-500/50 px-6 py-3 rounded-lg hover:bg-red-500 hover:text-white transition-all flex items-center gap-2 mx-auto">
+                <i data-feather="trash-2"></i>
+                מחק הכל והתחל יום חדש (משתמשים + משחקים)
+            </button>
+        </div>
+    </main>
+
+    <script type="module" src="admin.js"></script>
+</body>
+</html>
