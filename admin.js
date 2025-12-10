@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, push, set, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 // !!! PASTE YOUR FIREBASE CONFIG HERE !!!
 const firebaseConfig = {
@@ -35,7 +35,6 @@ addUserBtn.addEventListener('click', () => {
         return;
     }
 
-    // Push new user to DB
     const newUserRef = push(ref(db, 'users'));
     set(newUserRef, {
         name: name,
@@ -47,7 +46,7 @@ addUserBtn.addEventListener('click', () => {
     userNameIn.focus();
 });
 
-// Render Users List
+// Render Users
 onValue(ref(db, 'users'), (snapshot) => {
     usersList.innerHTML = '';
     const data = snapshot.val();
@@ -74,7 +73,6 @@ onValue(ref(db, 'users'), (snapshot) => {
     });
     feather.replace();
 
-    // Attach Delete Events
     document.querySelectorAll('.delete-user').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
@@ -87,7 +85,7 @@ onValue(ref(db, 'users'), (snapshot) => {
 
 
 // ------------------------------------------------------------------
-// 2. MANAGE GAMES
+// 2. MANAGE GAMES (Updated with Start Button)
 // ------------------------------------------------------------------
 const gameHomeIn = document.getElementById('game-home');
 const gameAwayIn = document.getElementById('game-away');
@@ -108,7 +106,8 @@ addGameBtn.addEventListener('click', () => {
     set(newGameRef, {
         home: home,
         away: away,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        started: false // Default state
     });
 
     gameHomeIn.value = '';
@@ -116,7 +115,7 @@ addGameBtn.addEventListener('click', () => {
     gameHomeIn.focus();
 });
 
-// Render Games List
+// Render Games
 onValue(ref(db, 'games'), (snapshot) => {
     gamesList.innerHTML = '';
     const data = snapshot.val();
@@ -128,10 +127,23 @@ onValue(ref(db, 'games'), (snapshot) => {
 
     Object.keys(data).forEach(key => {
         const game = data[key];
+        const isStarted = game.started === true;
+        
         const div = document.createElement('div');
         div.className = "flex justify-between items-center bg-gray-50 p-3 rounded border border-gray-100";
+        
         div.innerHTML = `
-            <span class="font-bold text-gray-700">${game.home} - ${game.away}</span>
+            <div class="flex items-center gap-3">
+                <span class="font-bold text-gray-700">${game.home} - ${game.away}</span>
+                ${isStarted ? 
+                    `<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1">
+                        <i data-feather="check" class="w-3 h-3"></i> פעיל
+                     </span>` : 
+                    `<button class="start-game-btn bg-white border border-green-500 text-green-600 text-xs px-3 py-1 rounded hover:bg-green-50 font-bold transition" data-id="${key}">
+                        התחל משחק
+                     </button>`
+                }
+            </div>
             <button class="delete-game text-red-400 hover:text-red-600 p-1" data-id="${key}">
                 <i data-feather="trash-2" class="w-4 h-4"></i>
             </button>
@@ -140,12 +152,22 @@ onValue(ref(db, 'games'), (snapshot) => {
     });
     feather.replace();
 
-    // Attach Delete Events
+    // Event: Start Game
+    document.querySelectorAll('.start-game-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.dataset.id;
+            // Update the specific game's status to started
+            update(ref(db, `games/${id}`), {
+                started: true
+            });
+        });
+    });
+
+    // Event: Delete Game
     document.querySelectorAll('.delete-game').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
-            if(confirm("למחוק משחק זה? (זה ימחק גם את ההימורים והתוצאות שלו)")) {
-                // Remove game, scores, and bets associated with it
+            if(confirm("למחוק משחק זה?")) {
                 remove(ref(db, `games/${id}`));
                 remove(ref(db, `scores/${id}`));
                 remove(ref(db, `bets/${id}`));
