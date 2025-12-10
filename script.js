@@ -11,6 +11,7 @@ const firebaseConfig = {
   messagingSenderId: "520474072792",
   appId: "1:520474072792:web:0beb13263d2b9a03d0a9ad"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
@@ -99,23 +100,23 @@ function renderGameBlock(gameId, game) {
 
     let betsHTML = '';
     participants.forEach(p => {
+        // Added 'text-gray-900' to inputs to force black text
         betsHTML += `
             <div class="bet-cell bg-white p-2 border-r border-b border-gray-200 flex items-center justify-center gap-1 transition-colors duration-300 min-h-[50px]" data-player="${p}">
-                <input type="number" class="bet-input-home w-8 text-center text-sm border border-gray-200 rounded focus:border-blue-500 outline-none p-1" placeholder="-">
+                <input type="number" class="bet-input-home w-8 text-center text-sm border border-gray-200 rounded focus:border-blue-500 outline-none p-1 text-gray-900" placeholder="-">
                 <span class="text-gray-300">:</span>
-                <input type="number" class="bet-input-away w-8 text-center text-sm border border-gray-200 rounded focus:border-blue-500 outline-none p-1" placeholder="-">
+                <input type="number" class="bet-input-away w-8 text-center text-sm border border-gray-200 rounded focus:border-blue-500 outline-none p-1 text-gray-900" placeholder="-">
             </div>
         `;
     });
 
-    // Contains the overflow-x-auto for mobile scrolling
     block.innerHTML = `
         <div class="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white sticky left-0 right-0">
             <h3 class="text-xl font-bold text-gray-800">${game.home} - ${game.away}</h3>
             <div class="flex items-center gap-2 bg-gray-100 p-2 rounded-lg ltr">
-                <input type="number" class="real-score-away w-10 text-center border border-gray-300 rounded p-1" placeholder="-">
+                <input type="number" class="real-score-away w-10 text-center border border-gray-300 rounded p-1 text-gray-900" placeholder="-">
                 <span class="font-bold text-gray-400">:</span>
-                <input type="number" class="real-score-home w-10 text-center border border-gray-300 rounded p-1" placeholder="-">
+                <input type="number" class="real-score-home w-10 text-center border border-gray-300 rounded p-1 text-gray-900" placeholder="-">
                 <span class="text-sm text-gray-500 font-bold ml-2">תוצאה:</span>
             </div>
         </div>
@@ -170,7 +171,7 @@ function renderGameBlock(gameId, game) {
 }
 
 // -----------------------------------------------------------------------------
-// 4. CALCULATIONS (Fixed Text Color)
+// 4. CALCULATIONS (Bulletproof Text Color)
 // -----------------------------------------------------------------------------
 function recalculateAll() {
     const leaderboard = {};
@@ -195,13 +196,15 @@ function recalculateAll() {
                 awayIn.value = betsData[gameId][player].away;
             }
 
-            // RESET STYLES (Clean slate)
-            cell.classList.remove('bg-green-700', 'bg-green-300', 'bg-white', 'text-white'); // Removed text-white just in case
+            // RESET STYLES
+            cell.classList.remove('bg-green-700', 'bg-green-300', 'bg-white'); 
             cell.classList.add('bg-white'); 
             
-            // Ensure inputs are black text
+            // FORCE BLACK TEXT on Inputs (Overrides any white inheritance)
             homeIn.classList.remove('text-white');
+            homeIn.classList.add('text-gray-900'); 
             awayIn.classList.remove('text-white');
+            awayIn.classList.add('text-gray-900');
 
             if (realScore && realScore.home !== '' && realScore.away !== '' && homeIn.value !== '' && awayIn.value !== '') {
                 const rH = Number(realScore.home);
@@ -209,15 +212,16 @@ function recalculateAll() {
                 const bH = Number(homeIn.value);
                 const bA = Number(awayIn.value);
 
-                // EXACT SCORE (3 Points)
+                // EXACT SCORE
                 if (rH === bH && rA === bA) {
                     cell.classList.remove('bg-white');
-                    cell.classList.add('bg-green-700'); // Green background, NO text-white
-                    // We DO NOT add text-white class to inputs anymore
+                    cell.classList.add('bg-green-700'); 
+                    // Note: We are NOT adding text-white to inputs anymore. 
+                    // They stay text-gray-900 (Black).
                     leaderboard[player].points += 3;
                     leaderboard[player].exact += 1;
                 }
-                // CORRECT DIRECTION (1 Point)
+                // CORRECT DIRECTION
                 else if (
                     (bH > bA && rH > rA) ||
                     (bH < bA && rH < rA) ||
