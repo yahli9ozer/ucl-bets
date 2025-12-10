@@ -28,7 +28,7 @@ let historyData = {};
 onValue(ref(db, 'users'), snapshot => {
     usersData = snapshot.val() || {};
     renderUsersList();       
-    renderManualEntryForm(); 
+    renderManualEntryForm(); // This now auto-populates the list
 });
 onValue(ref(db, 'games'), snapshot => { gamesData = snapshot.val() || {}; renderGamesList(); });
 onValue(ref(db, 'scores'), snapshot => scoresData = snapshot.val() || {});
@@ -37,7 +37,7 @@ onValue(ref(db, 'bonus_questions'), snapshot => { bonusData = snapshot.val() || 
 onValue(ref(db, 'history'), snapshot => { historyData = snapshot.val() || {}; renderHistoryList(); });
 
 // ------------------------------------------------------------------
-// 1. MANAGE USERS (ACTIVE TOGGLE ADDED)
+// 1. MANAGE USERS
 // ------------------------------------------------------------------
 const userNameIn = document.getElementById('user-name');
 const userPassIn = document.getElementById('user-pass');
@@ -46,7 +46,6 @@ document.getElementById('add-user-btn').addEventListener('click', () => {
     const name = userNameIn.value.trim();
     const pass = userPassIn.value.trim();
     if (!name || !pass) return alert("חובה להזין שם וסיסמה");
-    // New users are active by default
     set(push(ref(db, 'users')), { name, password: pass, active: true });
     userNameIn.value = ''; userPassIn.value = ''; userNameIn.focus();
 });
@@ -59,12 +58,9 @@ function renderUsersList() {
         return;
     }
 
-    // Add Header for Active column if not exists (Optional purely visual tweak)
-    // We just render rows here
-
     Object.keys(usersData).forEach(key => {
         const u = usersData[key];
-        const isActive = u.active !== false; // Default to true if undefined
+        const isActive = u.active !== false; 
 
         const row = document.createElement('tr');
         row.className = "hover:bg-gray-50 border-b last:border-0";
@@ -88,23 +84,21 @@ function renderUsersList() {
                 <label class="inline-flex items-center cursor-pointer">
                     <input type="checkbox" class="active-toggle sr-only peer" data-id="${key}" ${isActive ? 'checked' : ''}>
                     <div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
-                    <span class="ms-2 text-xs font-medium text-gray-600">${isActive ? 'פעיל' : 'לא פעיל'}</span>
                 </label>
             </td>
             <td class="p-3 text-center">
-                <button class="del-usr text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded" data-id="${key}" title="מחיקה (זהירות!)"><i data-feather="trash-2" class="w-4 h-4"></i></button>
+                <button class="del-usr text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded" data-id="${key}"><i data-feather="trash-2" class="w-4 h-4"></i></button>
             </td>`;
         list.appendChild(row);
     });
     feather.replace();
     
-    // Toggle Active Status
     document.querySelectorAll('.active-toggle').forEach(input => input.addEventListener('change', e => {
         update(ref(db, `users/${e.target.dataset.id}`), { active: e.target.checked });
     }));
 
     document.querySelectorAll('.del-usr').forEach(btn => btn.addEventListener('click', e => {
-        if(confirm("שים לב! מחיקת משתמש תמחק אותו גם מההיסטוריה!\nעדיף להפוך אותו ל'לא פעיל'.\nהאם למחוק בכל זאת?")) remove(ref(db, `users/${e.currentTarget.dataset.id}`));
+        if(confirm("למחוק משתמש? (זה ימחק אותו מההיסטוריה!)")) remove(ref(db, `users/${e.currentTarget.dataset.id}`));
     }));
 
     document.querySelectorAll('.save-pass-btn').forEach(btn => btn.addEventListener('click', e => {
@@ -216,7 +210,7 @@ function renderBonusList() {
 }
 
 // ------------------------------------------------------------------
-// 4. ARCHIVE ROUND
+// 4. ARCHIVE ROUND (AUTOMATIC)
 // ------------------------------------------------------------------
 document.getElementById('archive-round-btn').addEventListener('click', () => {
     const name = document.getElementById('round-name').value.trim();
@@ -249,50 +243,61 @@ function getPoints(rH, rA, bH, bA) {
 }
 
 // ------------------------------------------------------------------
-// 5. MANUAL HISTORY & LIST
+// 5. MANUAL HISTORY & LIST (NEW: AUTO-SHOW ALL USERS)
 // ------------------------------------------------------------------
 const manualRowsContainer = document.getElementById('manual-rows-container');
 
 function renderManualEntryForm() {
     manualRowsContainer.innerHTML = '';
-    if(!usersData) return;
+    
+    if (!usersData) return;
+
+    // Iterate through ALL users (active AND inactive) so you can fix history for old players
     Object.keys(usersData).forEach(uid => {
-        addManualRow(); 
+        const u = usersData[uid];
+        const div = document.createElement('div');
+        div.className = "flex flex-col bg-orange-50 p-2 rounded border border-orange-100";
+        
+        div.innerHTML = `
+            <span class="text-xs font-bold text-gray-500 mb-1">${u.name}</span>
+            <input type="number" class="manual-score-input w-full p-2 border rounded text-center font-bold text-gray-800 focus:outline-orange-500" 
+                   placeholder="0" data-uid="${uid}">
+        `;
+        manualRowsContainer.appendChild(div);
     });
 }
-document.getElementById('add-manual-row-btn').addEventListener('click', () => {
-    const div = document.createElement('div');
-    div.className = "flex items-center gap-2 manual-row animate-fade-in mb-2";
-    let options = '<option value="">בחר שחקן...</option>';
-    if(usersData) Object.keys(usersData).forEach(uid => options += `<option value="${uid}">${usersData[uid].name}</option>`);
-    
-    div.innerHTML = `
-        <select class="manual-user-select flex-1 p-2 border rounded bg-white text-sm">${options}</select>
-        <input type="number" class="manual-score-input w-20 p-2 border rounded text-center" placeholder="נק'">
-        <button class="rm-row text-red-400 hover:text-red-600"><i data-feather="trash-2" class="w-4 h-4"></i></button>`;
-    
-    div.querySelector('.rm-row').addEventListener('click', () => div.remove());
-    manualRowsContainer.appendChild(div);
-    feather.replace();
-});
 
 document.getElementById('save-manual-round-btn').addEventListener('click', () => {
     const name = document.getElementById('manual-round-name').value.trim();
-    if (!name) return alert("שם מחזור חובה");
-    const rows = document.querySelectorAll('.manual-row');
-    if (rows.length === 0) return alert("הוסף שחקנים");
+    if (!name) return alert("חובה להזין שם למחזור");
 
+    const inputs = document.querySelectorAll('.manual-score-input');
     const results = {};
-    rows.forEach(row => {
-        const uid = row.querySelector('.manual-user-select').value;
-        const score = row.querySelector('.manual-score-input').value;
-        if(uid && score !== '') results[uid] = Number(score);
+    let hasData = false;
+
+    inputs.forEach(input => {
+        const uid = input.dataset.uid;
+        const score = input.value;
+
+        if (score !== '') {
+            results[uid] = Number(score);
+            hasData = true;
+        } else {
+            results[uid] = 0; // Default to 0 if left empty
+        }
     });
 
-    push(ref(db, 'history'), { name, timestamp: Date.now(), results });
-    alert("נשמר!");
+    if (!hasData && !confirm("לא הוזנו נקודות. האם לשמור מחזור עם 0 לכולם?")) return;
+
+    push(ref(db, 'history'), {
+        name: name,
+        timestamp: Date.now(),
+        results: results
+    });
+
+    alert("המחזור הידני נשמר בהצלחה!");
     document.getElementById('manual-round-name').value = '';
-    manualRowsContainer.innerHTML = '';
+    inputs.forEach(i => i.value = '');
 });
 
 function renderHistoryList() {
@@ -308,6 +313,7 @@ function renderHistoryList() {
         const date = new Date(item.timestamp).toLocaleDateString('he-IL');
         const li = document.createElement('li');
         li.className = "flex justify-between items-center bg-white p-3 rounded shadow-sm border border-gray-100 hover:bg-gray-50";
+        
         li.innerHTML = `
             <div><span class="font-bold text-gray-800 block">${item.name}</span><span class="text-xs text-gray-400">${date}</span></div>
             <div class="flex gap-2">
