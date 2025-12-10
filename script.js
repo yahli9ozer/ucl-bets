@@ -11,7 +11,6 @@ const firebaseConfig = {
   messagingSenderId: "520474072792",
   appId: "1:520474072792:web:0beb13263d2b9a03d0a9ad"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
@@ -36,7 +35,7 @@ const container = document.getElementById('matches-container');
 // -----------------------------------------------------------------------------
 onValue(ref(db, 'users'), (snapshot) => {
     usersData = snapshot.val() || {};
-    if (currentUser) renderAll();
+    if (currentUser) renderAll(); // Re-render structure if users change
 });
 
 loginBtn.addEventListener('click', attemptLogin);
@@ -74,20 +73,23 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 
 
 // -----------------------------------------------------------------------------
-// 2. DATA LISTENERS
+// 2. DATA LISTENERS (SMART SPLIT)
 // -----------------------------------------------------------------------------
 function startAppListeners() {
     feather.replace();
 
+    // STRUCTURAL CHANGES -> Full Re-render
     onValue(ref(db, 'games'), (s) => { gamesData = s.val() || {}; renderAll(); });
-    onValue(ref(db, 'scores'), (s) => { scoresData = s.val() || {}; renderAll(); });
-    onValue(ref(db, 'bets'), (s) => { betsData = s.val() || {}; renderAll(); });
     onValue(ref(db, 'bonus_questions'), (s) => { bonusQuestions = s.val() || {}; renderAll(); });
-    onValue(ref(db, 'bonus_bets'), (s) => { bonusBets = s.val() || {}; renderAll(); });
+
+    // VALUE CHANGES -> Update Only (No Re-render)
+    onValue(ref(db, 'scores'), (s) => { scoresData = s.val() || {}; recalculateAll(); });
+    onValue(ref(db, 'bets'), (s) => { betsData = s.val() || {}; recalculateAll(); });
+    onValue(ref(db, 'bonus_bets'), (s) => { bonusBets = s.val() || {}; recalculateAll(); });
 }
 
 // -----------------------------------------------------------------------------
-// 3. CORE RENDERING LOOP
+// 3. CORE RENDERING LOOP (Builds HTML)
 // -----------------------------------------------------------------------------
 function renderAll() {
     container.innerHTML = '';
@@ -98,27 +100,32 @@ function renderAll() {
         bonusPoints: usersData[key].bonusPoints || 0
     })).sort((a, b) => a.name.localeCompare(b.name));
 
+    // 1. Render Games
     if (gamesData) {
         Object.keys(gamesData).forEach(gameId => {
             renderGameBlock(gameId, gamesData[gameId], sortedUsers);
         });
     }
 
+    // 2. Render Bonus Section
     if (Object.keys(bonusQuestions).length > 0) {
         renderBonusSection(sortedUsers);
     }
 
-    calculateLeaderboard(sortedUsers);
+    // 3. Calculate (Apply values and colors)
+    recalculateAll();
+    
     feather.replace();
 }
 
 function renderGameBlock(gameId, game, sortedUsers) {
     const block = document.createElement('div');
     block.className = "match-block bg-white rounded-xl shadow-md overflow-hidden mb-6 border border-gray-100";
+    block.dataset.id = gameId; // Important for updates
 
     const isStarted = (game.started === true); 
-    const realScore = scoresData[gameId];
-
+    
+    // Header
     let headerHTML = '';
     sortedUsers.forEach(u => {
         const isMe = (u.id === currentUser.key);
@@ -126,50 +133,31 @@ function renderGameBlock(gameId, game, sortedUsers) {
         headerHTML += `<div class="p-2 border-r border-b border-gray-200 text-center font-bold text-xs sm:text-sm whitespace-nowrap ${bgClass}">${u.name}</div>`;
     });
 
+    // Betting Cells
     let betsHTML = '';
     sortedUsers.forEach(u => {
         const isMe = (u.id === currentUser.key);
-        let betHome = '';
-        let betAway = '';
-        if (betsData[gameId] && betsData[gameId][u.id]) {
-            betHome = betsData[gameId][u.id].home;
-            betAway = betsData[gameId][u.id].away;
-        }
-
         let cellContent = '';
         let cellClass = 'bg-white';
 
         if (isMe) {
             if (isStarted) {
-                cellContent = `<span class="font-bold text-gray-800 text-lg">${betHome} : ${betAway}</span>`;
+                cellContent = `<span class="bet-display font-bold text-gray-800 text-lg"></span>`;
             } else {
                 cellContent = `
-                    <input type="number" class="my-bet-home w-8 text-center text-sm border border-blue-200 bg-blue-50 rounded p-1 text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="-" value="${betHome}">
+                    <input type="number" class="my-bet-home w-8 text-center text-sm border border-blue-200 bg-blue-50 rounded p-1 text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="-">
                     <span class="text-blue-300">:</span>
-                    <input type="number" class="my-bet-away w-8 text-center text-sm border border-blue-200 bg-blue-50 rounded p-1 text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="-" value="${betAway}">
+                    <input type="number" class="my-bet-away w-8 text-center text-sm border border-blue-200 bg-blue-50 rounded p-1 text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="-">
                 `;
             }
         } else {
             if (isStarted) {
-                cellContent = `<span class="font-bold text-gray-800">${betHome} : ${betAway}</span>`;
-                if (realScore && betHome !== '' && betAway !== '') {
-                    const points = getPoints(realScore.home, realScore.away, betHome, betAway);
-                    if (points === 3) cellClass = 'bg-green-600 text-white';
-                    else if (points === 1) cellClass = 'bg-green-300';
-                    else cellClass = 'bg-red-200';
-                }
+                cellContent = `<span class="bet-display font-bold text-gray-800"></span>`;
             } else {
-                const hasBet = (betHome !== '' && betAway !== '');
-                cellContent = hasBet ? `<i data-feather="check-circle" class="w-5 h-5 text-green-500 opacity-50"></i>` : `<i data-feather="lock" class="w-4 h-4 text-gray-300"></i>`;
+                // Determine lock/check via JS update to avoid flicker
+                cellContent = `<span class="secret-icon"><i data-feather="lock" class="w-4 h-4 text-gray-300"></i></span>`;
                 cellClass = "bg-gray-50";
             }
-        }
-
-        if (isMe && isStarted && realScore && betHome !== '' && betAway !== '') {
-             const points = getPoints(realScore.home, realScore.away, betHome, betAway);
-             if (points === 3) cellClass = 'bg-green-600 text-white';
-             else if (points === 1) cellClass = 'bg-green-300';
-             else cellClass = 'bg-red-200';
         }
 
         betsHTML += `
@@ -191,9 +179,9 @@ function renderGameBlock(gameId, game, sortedUsers) {
             
             <div class="flex items-center gap-2 bg-gray-100 p-2 rounded-lg">
                 <span class="text-xs text-gray-500 font-bold ml-2">תוצאה:</span>
-                <input type="number" class="real-score-home w-10 text-center border border-gray-300 rounded p-1 text-gray-900 font-bold ${scoreBg}" placeholder="-" value="${realScore ? realScore.home : ''}" ${scoreDisabled}>
+                <input type="number" class="real-score-home w-10 text-center border border-gray-300 rounded p-1 text-gray-900 font-bold ${scoreBg}" placeholder="-" ${scoreDisabled}>
                 <span class="font-bold text-gray-400">:</span>
-                <input type="number" class="real-score-away w-10 text-center border border-gray-300 rounded p-1 text-gray-900 font-bold ${scoreBg}" placeholder="-" value="${realScore ? realScore.away : ''}" ${scoreDisabled}>
+                <input type="number" class="real-score-away w-10 text-center border border-gray-300 rounded p-1 text-gray-900 font-bold ${scoreBg}" placeholder="-" ${scoreDisabled}>
             </div>
         </div>
         
@@ -207,6 +195,7 @@ function renderGameBlock(gameId, game, sortedUsers) {
 
     container.appendChild(block);
 
+    // Event Listeners
     const myHomeIn = block.querySelector('.my-bet-home');
     const myAwayIn = block.querySelector('.my-bet-away');
     if (myHomeIn && myAwayIn) {
@@ -222,9 +211,6 @@ function renderGameBlock(gameId, game, sortedUsers) {
     }
 }
 
-// -----------------------------------------------------------------------------
-// 4. BONUS RENDERING (UPDATED VISIBILITY LOGIC)
-// -----------------------------------------------------------------------------
 function renderBonusSection(sortedUsers) {
     const bonusContainer = document.createElement('div');
     bonusContainer.className = "mt-12 bg-yellow-50 rounded-xl p-6 border-t-4 border-yellow-400";
@@ -234,48 +220,39 @@ function renderBonusSection(sortedUsers) {
     Object.keys(bonusQuestions).forEach(qid => {
         const questionObj = bonusQuestions[qid];
         const question = questionObj.question;
-        const isStarted = questionObj.started === true; // Check if admin started it
+        const isStarted = questionObj.started === true;
 
         let usersHeader = '';
         let answersRow = '';
         
         sortedUsers.forEach(u => {
             const isMe = (u.id === currentUser.key);
-            const userAnswer = (bonusBets[qid] && bonusBets[qid][u.id]) ? bonusBets[qid][u.id] : '';
             const bgClass = isMe ? 'bg-yellow-100 text-yellow-900' : 'bg-white text-gray-500';
-            
             usersHeader += `<div class="p-2 border-b text-center text-xs font-bold ${bgClass}">${u.name}</div>`;
             
             let content = '';
-            
-            // VISIBILITY LOGIC FOR BONUS
             if (isMe) {
                 if (isStarted) {
-                    // Start = Locked for me (Read Only)
-                    content = `<span class="text-sm font-bold text-gray-900">${userAnswer || '-'}</span>`;
+                    content = `<span class="my-bonus-display text-sm font-bold text-gray-900"></span>`;
                 } else {
-                    // Not Started = Editable
-                    content = `<input type="text" class="bonus-input w-full text-center text-sm border-0 bg-transparent focus:ring-0 p-1 font-bold text-gray-900" placeholder="..." value="${userAnswer}" data-qid="${qid}">`;
+                    content = `<input type="text" class="bonus-input w-full text-center text-sm border-0 bg-transparent focus:ring-0 p-1 font-bold text-gray-900" placeholder="..." data-qid="${qid}">`;
                 }
             } else {
                 if (isStarted) {
-                    // Started = Revealed
-                    content = `<span class="text-xs text-gray-800">${userAnswer || '-'}</span>`;
+                    content = `<span class="other-bonus-display text-xs text-gray-800"></span>`;
                 } else {
-                    // Not Started = Hidden (Lock icon)
-                    const hasAnswer = userAnswer && userAnswer.trim() !== '';
-                    content = hasAnswer ? `<i data-feather="check-circle" class="w-4 h-4 text-green-500 opacity-50"></i>` : `<i data-feather="lock" class="w-3 h-3 text-gray-300"></i>`;
+                    content = `<span class="bonus-secret-icon"><i data-feather="lock" class="w-3 h-3 text-gray-300"></i></span>`;
                 }
             }
             
-            answersRow += `<div class="p-2 border-r last:border-0 flex items-center justify-center min-h-[40px] bg-white">${content}</div>`;
+            answersRow += `<div class="p-2 border-r last:border-0 flex items-center justify-center min-h-[40px] bg-white bonus-cell" data-uid="${u.id}" data-qid="${qid}">${content}</div>`;
         });
 
         html += `
             <div class="mb-8 shadow-sm rounded-lg overflow-hidden border border-yellow-200">
                 <div class="bg-yellow-200 p-3 flex justify-between items-center px-4">
                     <span class="font-bold text-yellow-900 text-center w-full">${question}</span>
-                    ${isStarted ? '<i data-feather="unlock" class="text-green-600 w-4 h-4" title="פתוח לכולם"></i>' : '<i data-feather="lock" class="text-gray-500 w-4 h-4" title="הימור סמוי"></i>'}
+                    ${isStarted ? '<i data-feather="unlock" class="text-green-600 w-4 h-4"></i>' : '<i data-feather="lock" class="text-gray-500 w-4 h-4"></i>'}
                 </div>
                 <div class="overflow-x-auto">
                     <div class="grid" style="grid-template-columns: repeat(${sortedUsers.length}, minmax(100px, 1fr));">
@@ -299,51 +276,157 @@ function renderBonusSection(sortedUsers) {
     });
 }
 
-function getPoints(rH, rA, bH, bA) {
-    if (rH === '' || rA === '' || bH === '' || bA === '') return 0;
-    rH = Number(rH); rA = Number(rA); bH = Number(bH); bA = Number(bA);
-    if (rH === bH && rA === bA) return 3; 
-    if ((bH > bA && rH > rA) || (bH < bA && rH < rA) || (bH === bA && rH === rA)) return 1; 
-    return 0;
-}
+// -----------------------------------------------------------------------------
+// 4. SMART UPDATES (THE FIX)
+// -----------------------------------------------------------------------------
+function recalculateAll() {
+    // Need users list for leaderboard order
+    const sortedUsers = Object.keys(usersData).map(key => ({
+        id: key, 
+        name: usersData[key].name,
+        bonusPoints: usersData[key].bonusPoints || 0
+    })).sort((a, b) => a.name.localeCompare(b.name));
 
-function calculateLeaderboard(sortedUsers) {
     const leaderboard = sortedUsers.map(u => ({ 
-        id: u.id,
-        name: u.name, 
-        points: 0, 
-        exact: 0, 
-        direction: 0,
-        bonus: u.bonusPoints || 0
+        id: u.id, name: u.name, points: 0, exact: 0, direction: 0, bonus: u.bonusPoints 
     }));
 
-    if (gamesData) {
-        Object.keys(gamesData).forEach(gameId => {
-            const game = gamesData[gameId];
-            const realScore = scoresData[gameId];
-            if (!game.started || !realScore || realScore.home === '' || realScore.away === '') return;
+    // UPDATE GAMES
+    document.querySelectorAll('.match-block').forEach(block => {
+        const gameId = block.dataset.id;
+        const game = gamesData[gameId];
+        const realScore = scoresData[gameId];
+        const isStarted = game && game.started;
 
-            sortedUsers.forEach((u, index) => {
-                if (betsData[gameId] && betsData[gameId][u.id]) {
-                    const bet = betsData[gameId][u.id];
-                    const pts = getPoints(realScore.home, realScore.away, bet.home, bet.away);
-                    leaderboard[index].points += pts;
-                    if (pts === 3) leaderboard[index].exact++;
-                    if (pts === 1) leaderboard[index].direction++;
+        // Update Score Inputs (Only if not focused!)
+        const realH = block.querySelector('.real-score-home');
+        const realA = block.querySelector('.real-score-away');
+        if (realScore) {
+            if (document.activeElement !== realH) realH.value = realScore.home;
+            if (document.activeElement !== realA) realA.value = realScore.away;
+        }
+
+        // Loop Bet Cells
+        block.querySelectorAll('.bet-cell').forEach(cell => {
+            const uid = cell.dataset.uid;
+            const isMe = (uid === currentUser.key);
+            
+            let betHome = '', betAway = '';
+            if (betsData[gameId] && betsData[gameId][uid]) {
+                betHome = betsData[gameId][uid].home;
+                betAway = betsData[gameId][uid].away;
+            }
+
+            // Update Values in DOM
+            if (isMe) {
+                if (isStarted) {
+                    const span = cell.querySelector('.bet-display');
+                    if (span) span.innerText = `${betHome} : ${betAway}`;
+                } else {
+                    const inH = cell.querySelector('.my-bet-home');
+                    const inA = cell.querySelector('.my-bet-away');
+                    if (inH && document.activeElement !== inH) inH.value = betHome;
+                    if (inA && document.activeElement !== inA) inA.value = betAway;
                 }
-            });
-        });
-    }
+            } else {
+                if (isStarted) {
+                    const span = cell.querySelector('.bet-display');
+                    if (span) span.innerText = `${betHome} : ${betAway}`;
+                } else {
+                    // Update lock icon state (Check or Lock)
+                    const hasBet = (betHome !== '' && betAway !== '');
+                    const iconSpan = cell.querySelector('.secret-icon');
+                    if (iconSpan) {
+                        iconSpan.innerHTML = hasBet ? 
+                            `<i data-feather="check-circle" class="w-5 h-5 text-green-500 opacity-50"></i>` : 
+                            `<i data-feather="lock" class="w-4 h-4 text-gray-300"></i>`;
+                        feather.replace();
+                    }
+                }
+            }
 
-    leaderboard.forEach(p => {
-        p.points += p.bonus;
+            // Colors & Points
+            cell.classList.remove('bg-green-700', 'bg-green-300', 'bg-red-200', 'bg-white', 'text-white'); 
+            cell.classList.add('bg-white'); // Default
+            
+            // Force text black on inputs if cleaned
+            const inputs = cell.querySelectorAll('input');
+            inputs.forEach(i => { i.classList.remove('text-white'); i.classList.add('text-gray-900'); });
+
+            if (isStarted && realScore && realScore.home !== '' && realScore.away !== '' && betHome !== '' && betAway !== '') {
+                const pts = getPoints(realScore.home, realScore.away, betHome, betAway);
+                
+                // Add points to leaderboard
+                const userStat = leaderboard.find(u => u.id === uid);
+                if (userStat) {
+                    userStat.points += pts;
+                    if (pts === 3) userStat.exact++;
+                    if (pts === 1) userStat.direction++;
+                }
+
+                // Apply Colors (Only for me or if game started)
+                if (isMe || isStarted) {
+                    cell.classList.remove('bg-white');
+                    if (pts === 3) {
+                        cell.classList.add('bg-green-700', 'text-white'); // Green bg, White Text for container
+                        // Inputs inside might need white text if it's me
+                        inputs.forEach(i => { i.classList.remove('text-gray-900'); i.classList.add('text-white'); });
+                    }
+                    else if (pts === 1) cell.classList.add('bg-green-300');
+                    else cell.classList.add('bg-red-200');
+                }
+            } else if (!isMe && !isStarted) {
+                cell.classList.remove('bg-white');
+                cell.classList.add('bg-gray-50');
+            }
+        });
     });
 
+    // UPDATE BONUS
+    document.querySelectorAll('.bonus-cell').forEach(cell => {
+        const uid = cell.dataset.uid;
+        const qid = cell.dataset.qid;
+        const isMe = (uid === currentUser.key);
+        const questionObj = bonusQuestions[qid];
+        const isStarted = questionObj && questionObj.started;
+        
+        let answer = '';
+        if (bonusBets[qid] && bonusBets[qid][uid]) answer = bonusBets[qid][uid];
+
+        if (isMe) {
+            if (isStarted) {
+                const span = cell.querySelector('.my-bonus-display');
+                if (span) span.innerText = answer || '-';
+            } else {
+                const input = cell.querySelector('.bonus-input');
+                if (input && document.activeElement !== input) input.value = answer;
+            }
+        } else {
+            if (isStarted) {
+                const span = cell.querySelector('.other-bonus-display');
+                if (span) span.innerText = answer || '-';
+            } else {
+                const iconSpan = cell.querySelector('.bonus-secret-icon');
+                if (iconSpan) {
+                    iconSpan.innerHTML = answer ? 
+                        `<i data-feather="check-circle" class="w-4 h-4 text-green-500 opacity-50"></i>` : 
+                        `<i data-feather="lock" class="w-3 h-3 text-gray-300"></i>`;
+                    feather.replace();
+                }
+            }
+        }
+    });
+
+    // UPDATE LEADERBOARD
+    leaderboard.forEach(p => p.points += p.bonus);
     leaderboard.sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
         return b.exact - a.exact;
     });
+    renderLeaderboardTable(leaderboard);
+}
 
+function renderLeaderboardTable(leaderboard) {
     const tbody = document.getElementById('leaderboard-body');
     const headerRow = document.querySelector('#leaderboard-body').parentElement.querySelector('tr');
     
@@ -370,7 +453,7 @@ function calculateLeaderboard(sortedUsers) {
                 ${p.name}
             </td>
             <td class="p-3 text-lg text-blue-600 font-bold">${p.points}</td>
-            <td class="p-3 text-sm text-green-600 font-bold">${p.exact}</td>
+            <td class="p-3 text-sm text-green-700 font-bold">${p.exact}</td>
             <td class="p-3 text-sm text-gray-500 font-normal">${p.direction}</td>
             <td class="p-3 flex items-center justify-center gap-1">
                 <button class="bonus-btn-minus bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-500 w-6 h-6 rounded text-xs" data-uid="${p.id}">-</button>
@@ -391,9 +474,15 @@ function calculateLeaderboard(sortedUsers) {
 
 function updateBonus(uid, change) {
     const currentBonus = usersData[uid].bonusPoints || 0;
-    update(ref(db, `users/${uid}`), {
-        bonusPoints: currentBonus + change
-    });
+    update(ref(db, `users/${uid}`), { bonusPoints: currentBonus + change });
+}
+
+function getPoints(rH, rA, bH, bA) {
+    if (rH === '' || rA === '' || bH === '' || bA === '') return 0;
+    rH = Number(rH); rA = Number(rA); bH = Number(bH); bA = Number(bA);
+    if (rH === bH && rA === bA) return 3; 
+    if ((bH > bA && rH > rA) || (bH < bA && rH < rA) || (bH === bA && rH === rA)) return 1; 
+    return 0;
 }
 
 // -----------------------------------------------------------------------------
@@ -403,13 +492,7 @@ function createFallingBackground() {
     const container = document.getElementById('falling-elements-container');
     if (!container) return;
 
-    const itemImages = [
-      'assets/item1.png',
-      'assets/item2.png',
-      'assets/item3.png',
-      'assets/item4.png',
-    'assets/item5.png',
-    'assets/item6.png'];
+    const itemImages = ['assets/item1.png','assets/item2.png','assets/item3.png','assets/item4.png','assets/item5.png','assets/item6.png'];
 
     function spawnItem() {
         const item = document.createElement('img');
@@ -430,9 +513,7 @@ function createFallingBackground() {
 
         container.appendChild(item);
 
-        setTimeout(() => {
-            item.remove();
-        }, (duration + delay) * 1000);
+        setTimeout(() => { item.remove(); }, (duration + delay) * 1000);
     }
 
     setInterval(spawnItem, 500);
