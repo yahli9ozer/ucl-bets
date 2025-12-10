@@ -82,8 +82,6 @@ function startAppListeners() {
     onValue(ref(db, 'games'), (s) => { gamesData = s.val() || {}; renderAll(); });
     onValue(ref(db, 'scores'), (s) => { scoresData = s.val() || {}; renderAll(); });
     onValue(ref(db, 'bets'), (s) => { betsData = s.val() || {}; renderAll(); });
-    
-    // Listen for Bonuses
     onValue(ref(db, 'bonus_questions'), (s) => { bonusQuestions = s.val() || {}; renderAll(); });
     onValue(ref(db, 'bonus_bets'), (s) => { bonusBets = s.val() || {}; renderAll(); });
 }
@@ -97,7 +95,7 @@ function renderAll() {
     const sortedUsers = Object.keys(usersData).map(key => ({
         id: key,
         name: usersData[key].name,
-        bonusPoints: usersData[key].bonusPoints || 0 // Get stored bonus points
+        bonusPoints: usersData[key].bonusPoints || 0
     })).sort((a, b) => a.name.localeCompare(b.name));
 
     // 1. Render Games
@@ -107,12 +105,12 @@ function renderAll() {
         });
     }
 
-    // 2. Render Bonus Questions Section
+    // 2. Render Bonus Section
     if (Object.keys(bonusQuestions).length > 0) {
         renderBonusSection(sortedUsers);
     }
 
-    // 3. Calculate Leaderboard
+    // 3. Calculate Leaderboard (Here is the update!)
     calculateLeaderboard(sortedUsers);
     
     feather.replace();
@@ -172,7 +170,6 @@ function renderGameBlock(gameId, game, sortedUsers) {
             }
         }
 
-        // Color for ME if started
         if (isMe && isStarted && realScore && betHome !== '' && betAway !== '') {
              const points = getPoints(realScore.home, realScore.away, betHome, betAway);
              if (points === 3) cellClass = 'bg-green-600 text-white';
@@ -215,7 +212,6 @@ function renderGameBlock(gameId, game, sortedUsers) {
 
     container.appendChild(block);
 
-    // Event Listeners (Same as before)
     const myHomeIn = block.querySelector('.my-bet-home');
     const myAwayIn = block.querySelector('.my-bet-away');
     if (myHomeIn && myAwayIn) {
@@ -231,9 +227,7 @@ function renderGameBlock(gameId, game, sortedUsers) {
     }
 }
 
-// -----------------------------------------------------------------------------
-// 4. BONUS RENDERING
-// -----------------------------------------------------------------------------
+// BONUS
 function renderBonusSection(sortedUsers) {
     const bonusContainer = document.createElement('div');
     bonusContainer.className = "mt-12 bg-yellow-50 rounded-xl p-6 border-t-4 border-yellow-400";
@@ -244,7 +238,6 @@ function renderBonusSection(sortedUsers) {
         const question = bonusQuestions[qid].question;
         const myAnswer = (bonusBets[qid] && bonusBets[qid][currentUser.key]) ? bonusBets[qid][currentUser.key] : '';
         
-        // Header Row
         let usersHeader = '';
         let answersRow = '';
         
@@ -255,14 +248,10 @@ function renderBonusSection(sortedUsers) {
             
             usersHeader += `<div class="p-2 border-b text-center text-xs font-bold ${bgClass}">${u.name}</div>`;
             
-            // Content
             let content = '';
             if (isMe) {
-                // Editable Text Area for Me
                 content = `<input type="text" class="bonus-input w-full text-center text-sm border-0 bg-transparent focus:ring-0 p-1 font-bold text-gray-900" placeholder="..." value="${userAnswer}" data-qid="${qid}">`;
             } else {
-                // Read Only for Others (Always visible or hidden? Let's keep visible for fun, or hidden if you want)
-                // Let's keep it visible for bonus bets as they are usually funny
                 content = `<span class="text-xs text-gray-800">${userAnswer || '-'}</span>`;
             }
             
@@ -285,9 +274,8 @@ function renderBonusSection(sortedUsers) {
     bonusContainer.innerHTML = html;
     container.appendChild(bonusContainer);
 
-    // Event Listeners for Bonus Inputs
     bonusContainer.querySelectorAll('.bonus-input').forEach(input => {
-        input.addEventListener('change', (e) => { // 'change' saves on enter/blur
+        input.addEventListener('change', (e) => { 
             const qid = e.target.dataset.qid;
             const val = e.target.value;
             set(ref(db, `bonus_bets/${qid}/${currentUser.key}`), val);
@@ -296,7 +284,7 @@ function renderBonusSection(sortedUsers) {
 }
 
 // -----------------------------------------------------------------------------
-// 5. LEADERBOARD & CALC
+// 5. LEADERBOARD & CALC (UPDATED SORT LOGIC)
 // -----------------------------------------------------------------------------
 function getPoints(rH, rA, bH, bA) {
     if (rH === '' || rA === '' || bH === '' || bA === '') return 0;
@@ -313,7 +301,7 @@ function calculateLeaderboard(sortedUsers) {
         points: 0, 
         exact: 0, 
         direction: 0,
-        bonus: u.bonusPoints || 0 // Start with stored bonus
+        bonus: u.bonusPoints || 0
     }));
 
     if (gamesData) {
@@ -334,16 +322,21 @@ function calculateLeaderboard(sortedUsers) {
         });
     }
 
-    // Add Bonus Points to Total
     leaderboard.forEach(p => {
         p.points += p.bonus;
     });
 
-    leaderboard.sort((a, b) => b.points - a.points);
+    // *** UPDATED SORT: Points First -> Exact (Bullseye) Second ***
+    leaderboard.sort((a, b) => {
+        if (b.points !== a.points) {
+            return b.points - a.points; // Primary sort by points
+        }
+        return b.exact - a.exact; // Secondary sort by 'Exact' count
+    });
+
     const tbody = document.getElementById('leaderboard-body');
     const headerRow = document.querySelector('#leaderboard-body').parentElement.querySelector('tr');
     
-    // Add Bonus Header if missing
     if (!headerRow.querySelector('.bonus-head')) {
         const th = document.createElement('th');
         th.className = "p-2 bonus-head text-yellow-600";
@@ -378,7 +371,6 @@ function calculateLeaderboard(sortedUsers) {
         tbody.appendChild(row);
     });
 
-    // Attach Bonus Button Events
     document.querySelectorAll('.bonus-btn-plus').forEach(btn => {
         btn.addEventListener('click', (e) => updateBonus(e.target.dataset.uid, 1));
     });
