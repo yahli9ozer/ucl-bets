@@ -3,71 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kicker Betting Live ⚽</title>
+    <title>Kicker Live ⚽</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/feather-icons"></script>
     <script src="components/navbar.js"></script>
 </head>
-<body class="bg-gray-50 text-right">
+<body class="bg-gray-100 text-right h-screen overflow-hidden">
     
-    <custom-navbar></custom-navbar>
-    
-    <main class="container mx-auto px-4 py-8">
-        <div class="max-w-6xl mx-auto">
-            
-            <div class="flex flex-col md:flex-row justify-between items-center mb-8">
-                <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-2">
-                    <i data-feather="activity"></i> אלופות וניחושים LIVE
-                </h1>
-                
-                <div class="mt-4 md:mt-0 bg-white p-3 rounded-lg shadow-sm flex gap-2 items-center border border-gray-200">
-                    <input type="text" id="new-home" placeholder="קבוצת בית" class="p-2 border rounded w-32 text-sm">
-                    <span class="font-bold text-gray-400">-</span>
-                    <input type="text" id="new-away" placeholder="קבוצת חוץ" class="p-2 border rounded w-32 text-sm">
-                    <button id="add-game-btn" class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 text-sm font-bold flex items-center gap-1">
-                        <i data-feather="plus-circle" class="w-4 h-4"></i> הוסף משחק
-                    </button>
-                </div>
+    <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center">
+            <div class="mb-6 bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-blue-600">
+                <i data-feather="lock" class="w-8 h-8"></i>
             </div>
-
-            <div class="bg-white rounded-xl shadow-lg p-6 mb-8 border-2 border-blue-100">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i data-feather="award" class="mr-2 text-yellow-500"></i> טבלת הניקוד
-                </h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-center">
-                        <thead>
-                            <tr class="text-gray-500 text-sm border-b">
-                                <th class="p-2 text-right">משתתף</th>
-                                <th class="p-2">נקודות</th>
-                                <th class="p-2">בול (3)</th>
-                                <th class="p-2">כיוון (1)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="leaderboard-body" class="text-gray-800 font-bold">
-                            </tbody>
-                    </table>
-                </div>
-            </div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">הזדהות</h2>
+            <p class="text-gray-500 mb-6 text-sm">יש להזין שם וסיסמה כדי להמר</p>
             
-            <div id="matches-container" class="space-y-8">
-                </div>
-
-            <div class="text-center mt-12">
-                <button id="clear-all-btn" class="text-red-400 text-xs hover:text-red-600 underline">
-                    מחק את כל המשחקים והתחל יום חדש
+            <div class="space-y-3">
+                <input type="text" id="login-name" placeholder="שם משתמש" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition">
+                <input type="password" id="login-pass" placeholder="סיסמה" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition">
+                <button id="login-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition transform active:scale-95">
+                    כניסה למערכת
                 </button>
             </div>
+            <p id="login-error" class="text-red-500 text-sm mt-4 hidden font-bold"></p>
         </div>
-    </main>
+        <p class="text-slate-500 mt-8 text-xs">Kicker Betting System 2025 ©</p>
+    </div>
 
-    <footer class="bg-gray-100 py-6 mt-12">
-        <div class="container mx-auto px-4 text-center text-gray-600">
-            <p>© 2025 Kicker Agile Betting</p>
-        </div>
-    </footer>
-    
+    <div id="app-content" class="hidden h-full overflow-y-auto">
+        <custom-navbar></custom-navbar>
+        
+        <main class="container mx-auto px-4 py-8 pb-24">
+            <div class="max-w-7xl mx-auto">
+                
+                <div class="flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <div>
+                        <p class="text-sm text-gray-500">שלום,</p>
+                        <h2 id="display-username" class="text-xl font-bold text-blue-600">--</h2>
+                    </div>
+                    <button id="logout-btn" class="text-gray-400 hover:text-red-500 text-sm font-medium flex items-center gap-1">
+                        <i data-feather="log-out" class="w-4 h-4"></i> יציאה
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-8 border-t-4 border-blue-500">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <i data-feather="award" class="mr-2 text-yellow-500"></i> טבלת הניקוד
+                    </h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-center whitespace-nowrap">
+                            <thead>
+                                <tr class="text-gray-500 text-xs border-b">
+                                    <th class="p-2 text-right">משתתף</th>
+                                    <th class="p-2">נק'</th>
+                                    <th class="p-2">בול</th>
+                                    <th class="p-2">כיוון</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboard-body" class="text-gray-800 font-bold text-sm">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div id="matches-container" class="space-y-6">
+                    </div>
+            </div>
+        </main>
+    </div>
+
     <script type="module" src="script.js"></script>
 </body>
 </html>
