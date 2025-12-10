@@ -10,3 +10,68 @@ input[type=number]::-webkit-outer-spin-button {
 input[type=number] {
     -moz-appearance: textfield;
 }
+/* שינוי רקע כללי לאווירה יוקרתית יותר */
+body {
+    /* גרדיאנט כחול כהה */
+    background: radial-gradient(ellipse at bottom, #1e293b 0%, #0f172a 100%);
+    color: #f1f5f9; /* טקסט בהיר */
+    min-height: 100vh;
+}
+
+/* התאמות לקופסאות הלבנות שיראו טוב על הרקע הכהה */
+.bg-white, .bg-gray-50 {
+    background-color: rgba(30, 41, 59, 0.8) !important; /* חצי שקוף כהה */
+    backdrop-filter: blur(10px); /* אפקט זכוכית */
+    border-color: rgba(51, 65, 85, 0.5) !important;
+    color: #e2e8f0 !important;
+}
+
+.text-gray-800, .text-gray-700, .text-gray-600, .text-gray-500 {
+    color: #cbd5e1 !important;
+}
+
+/* מיכל לאלמנטים הנופלים - שלא יפריע ללחיצות */
+#falling-elements-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    z-index: -1; /* מאחורי הכל */
+    pointer-events: none; /* לא מפריע לעכבר */
+}
+
+/* המחלקה של פריט נופל בודד */
+.falling-item {
+    position: absolute;
+    top: -100px; /* מתחיל מחוץ למסך למעלה */
+    animation-name: fallDown;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+/* הגדרת האנימציה */
+@keyframes fallDown {
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.8;
+    }
+    90% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateY(110vh) rotate(360deg); /* נופל עד למטה ומסתובב */
+        opacity: 0;
+    }
+}
+
+/* התאמות ספציפיות לאלמנטים כהים */
+input, select {
+     background-color: rgba(15, 23, 42, 0.8) !important;
+     color: white !important;
+     border-color: #475569 !important;
+}
