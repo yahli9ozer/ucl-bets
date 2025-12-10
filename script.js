@@ -98,21 +98,17 @@ function renderAll() {
         bonusPoints: usersData[key].bonusPoints || 0
     })).sort((a, b) => a.name.localeCompare(b.name));
 
-    // 1. Render Games
     if (gamesData) {
         Object.keys(gamesData).forEach(gameId => {
             renderGameBlock(gameId, gamesData[gameId], sortedUsers);
         });
     }
 
-    // 2. Render Bonus Section
     if (Object.keys(bonusQuestions).length > 0) {
         renderBonusSection(sortedUsers);
     }
 
-    // 3. Calculate Leaderboard
     calculateLeaderboard(sortedUsers);
-    
     feather.replace();
 }
 
@@ -133,7 +129,6 @@ function renderGameBlock(gameId, game, sortedUsers) {
     let betsHTML = '';
     sortedUsers.forEach(u => {
         const isMe = (u.id === currentUser.key);
-        
         let betHome = '';
         let betAway = '';
         if (betsData[gameId] && betsData[gameId][u.id]) {
@@ -227,7 +222,9 @@ function renderGameBlock(gameId, game, sortedUsers) {
     }
 }
 
-// BONUS
+// -----------------------------------------------------------------------------
+// 4. BONUS RENDERING (UPDATED VISIBILITY LOGIC)
+// -----------------------------------------------------------------------------
 function renderBonusSection(sortedUsers) {
     const bonusContainer = document.createElement('div');
     bonusContainer.className = "mt-12 bg-yellow-50 rounded-xl p-6 border-t-4 border-yellow-400";
@@ -235,9 +232,10 @@ function renderBonusSection(sortedUsers) {
     let html = `<h2 class="text-xl font-bold text-yellow-800 mb-6 flex items-center gap-2"><i data-feather="star"></i> שאלות בונוס</h2>`;
     
     Object.keys(bonusQuestions).forEach(qid => {
-        const question = bonusQuestions[qid].question;
-        const myAnswer = (bonusBets[qid] && bonusBets[qid][currentUser.key]) ? bonusBets[qid][currentUser.key] : '';
-        
+        const questionObj = bonusQuestions[qid];
+        const question = questionObj.question;
+        const isStarted = questionObj.started === true; // Check if admin started it
+
         let usersHeader = '';
         let answersRow = '';
         
@@ -249,10 +247,25 @@ function renderBonusSection(sortedUsers) {
             usersHeader += `<div class="p-2 border-b text-center text-xs font-bold ${bgClass}">${u.name}</div>`;
             
             let content = '';
+            
+            // VISIBILITY LOGIC FOR BONUS
             if (isMe) {
-                content = `<input type="text" class="bonus-input w-full text-center text-sm border-0 bg-transparent focus:ring-0 p-1 font-bold text-gray-900" placeholder="..." value="${userAnswer}" data-qid="${qid}">`;
+                if (isStarted) {
+                    // Start = Locked for me (Read Only)
+                    content = `<span class="text-sm font-bold text-gray-900">${userAnswer || '-'}</span>`;
+                } else {
+                    // Not Started = Editable
+                    content = `<input type="text" class="bonus-input w-full text-center text-sm border-0 bg-transparent focus:ring-0 p-1 font-bold text-gray-900" placeholder="..." value="${userAnswer}" data-qid="${qid}">`;
+                }
             } else {
-                content = `<span class="text-xs text-gray-800">${userAnswer || '-'}</span>`;
+                if (isStarted) {
+                    // Started = Revealed
+                    content = `<span class="text-xs text-gray-800">${userAnswer || '-'}</span>`;
+                } else {
+                    // Not Started = Hidden (Lock icon)
+                    const hasAnswer = userAnswer && userAnswer.trim() !== '';
+                    content = hasAnswer ? `<i data-feather="check-circle" class="w-4 h-4 text-green-500 opacity-50"></i>` : `<i data-feather="lock" class="w-3 h-3 text-gray-300"></i>`;
+                }
             }
             
             answersRow += `<div class="p-2 border-r last:border-0 flex items-center justify-center min-h-[40px] bg-white">${content}</div>`;
@@ -260,7 +273,10 @@ function renderBonusSection(sortedUsers) {
 
         html += `
             <div class="mb-8 shadow-sm rounded-lg overflow-hidden border border-yellow-200">
-                <div class="bg-yellow-200 p-3 font-bold text-yellow-900 text-center">${question}</div>
+                <div class="bg-yellow-200 p-3 flex justify-between items-center px-4">
+                    <span class="font-bold text-yellow-900 text-center w-full">${question}</span>
+                    ${isStarted ? '<i data-feather="unlock" class="text-green-600 w-4 h-4" title="פתוח לכולם"></i>' : '<i data-feather="lock" class="text-gray-500 w-4 h-4" title="הימור סמוי"></i>'}
+                </div>
                 <div class="overflow-x-auto">
                     <div class="grid" style="grid-template-columns: repeat(${sortedUsers.length}, minmax(100px, 1fr));">
                         ${usersHeader}
@@ -283,9 +299,6 @@ function renderBonusSection(sortedUsers) {
     });
 }
 
-// -----------------------------------------------------------------------------
-// 5. LEADERBOARD & CALC
-// -----------------------------------------------------------------------------
 function getPoints(rH, rA, bH, bA) {
     if (rH === '' || rA === '' || bH === '' || bA === '') return 0;
     rH = Number(rH); rA = Number(rA); bH = Number(bH); bA = Number(bA);
@@ -357,9 +370,7 @@ function calculateLeaderboard(sortedUsers) {
                 ${p.name}
             </td>
             <td class="p-3 text-lg text-blue-600 font-bold">${p.points}</td>
-            
-            <td class="p-3 text-sm text-green-700 font-bold">${p.exact}</td>
-            
+            <td class="p-3 text-sm text-green-600 font-bold">${p.exact}</td>
             <td class="p-3 text-sm text-gray-500 font-normal">${p.direction}</td>
             <td class="p-3 flex items-center justify-center gap-1">
                 <button class="bonus-btn-minus bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-500 w-6 h-6 rounded text-xs" data-uid="${p.id}">-</button>
@@ -386,25 +397,16 @@ function updateBonus(uid, change) {
 }
 
 // -----------------------------------------------------------------------------
-// 6. FALLING BACKGROUND ANIMATION (The missing part!)
+// 6. FALLING BACKGROUND
 // -----------------------------------------------------------------------------
 function createFallingBackground() {
     const container = document.getElementById('falling-elements-container');
     if (!container) return;
 
-    // רשימת התמונות שייפלו (ודא שהן קיימות בתיקיית assets)
-    const itemImages = [
-        'assets/item1.png', 
-        'assets/item2.png', 
-        'assets/item3.png', 
-        'assets/item4.png',
-      'assets/item5.png',
-      'assets/item6.png'
-    ];
+    const itemImages = ['assets/item1.png', 'assets/item2.png', 'assets/item3.png', 'assets/item4.png'];
 
     function spawnItem() {
         const item = document.createElement('img');
-        
         const randomImg = itemImages[Math.floor(Math.random() * itemImages.length)];
         item.src = randomImg;
         item.classList.add('falling-item');
