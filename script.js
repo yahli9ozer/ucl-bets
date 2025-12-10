@@ -367,7 +367,7 @@ function recalculateAll() {
                     cell.classList.remove('bg-white');
                     // We keep text-gray-900 (Black) as enforced above by hasResult
                     if (pts === 3) {
-                        cell.classList.add('bg-green-400');
+                        cell.classList.add('bg-green-600');
                     }
                     else if (pts === 1) {
                         cell.classList.add('bg-green-200');
