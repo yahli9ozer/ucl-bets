@@ -86,7 +86,7 @@ onValue(ref(db, 'bets'), (snapshot) => {
 
 
 // -----------------------------------------------------------------------------
-// 3. RENDERING (Fixed Directions)
+// 3. RENDERING
 // -----------------------------------------------------------------------------
 function renderGameBlock(gameId, game) {
     const block = document.createElement('div');
@@ -109,7 +109,6 @@ function renderGameBlock(gameId, game) {
         `;
     });
 
-    // *** FIX IS HERE: Removed 'ltr' class and ensured Home is First (Right) ***
     block.innerHTML = `
         <div class="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white sticky left-0 right-0">
             <h3 class="text-xl font-bold text-gray-800">${game.home} - ${game.away}</h3>
@@ -200,8 +199,8 @@ function recalculateAll() {
                 awayIn.value = betsData[gameId][player].away;
             }
 
-            // RESET STYLES
-            cell.classList.remove('bg-green-700', 'bg-green-300', 'bg-white'); 
+            // RESET STYLES (Clean slate for all colors including red)
+            cell.classList.remove('bg-green-700', 'bg-green-300', 'bg-red-200', 'bg-white'); 
             cell.classList.add('bg-white'); 
             
             homeIn.classList.remove('text-white');
@@ -215,14 +214,14 @@ function recalculateAll() {
                 const bH = Number(homeIn.value);
                 const bA = Number(awayIn.value);
 
-                // EXACT SCORE
+                // EXACT SCORE (3 Points)
                 if (rH === bH && rA === bA) {
                     cell.classList.remove('bg-white');
                     cell.classList.add('bg-green-700'); 
                     leaderboard[player].points += 3;
                     leaderboard[player].exact += 1;
                 }
-                // CORRECT DIRECTION
+                // CORRECT DIRECTION (1 Point)
                 else if (
                     (bH > bA && rH > rA) ||
                     (bH < bA && rH < rA) ||
@@ -232,6 +231,11 @@ function recalculateAll() {
                     cell.classList.add('bg-green-300');
                     leaderboard[player].points += 1;
                     leaderboard[player].direction += 1;
+                }
+                // NEW: WRONG BET (0 Points)
+                else {
+                    cell.classList.remove('bg-white');
+                    cell.classList.add('bg-red-200'); // Light red
                 }
             }
         });
