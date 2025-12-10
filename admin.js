@@ -37,7 +37,7 @@ onValue(ref(db, 'bonus_questions'), snapshot => { bonusData = snapshot.val() || 
 onValue(ref(db, 'history'), snapshot => { historyData = snapshot.val() || {}; renderHistoryList(); });
 
 // ------------------------------------------------------------------
-// 1. MANAGE USERS (UPDATED WITH PASSWORD CHANGE)
+// 1. MANAGE USERS
 // ------------------------------------------------------------------
 const userNameIn = document.getElementById('user-name');
 const userPassIn = document.getElementById('user-pass');
@@ -63,52 +63,31 @@ function renderUsersList() {
         const row = document.createElement('tr');
         row.className = "hover:bg-gray-50 border-b last:border-0";
         
-        // New structure: Password is an Input field with a Save button
         row.innerHTML = `
             <td class="p-3 font-bold text-gray-700">${u.name}</td>
             <td class="p-3">
                 <div class="flex items-center gap-2">
                     <input type="text" class="pass-input border border-gray-300 rounded px-2 py-1 w-24 text-sm font-mono text-gray-600 focus:border-blue-500 focus:text-black outline-none transition" 
                            value="${u.password}" id="pass-${key}">
-                    
                     <button class="save-pass-btn text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 p-1.5 rounded transition" 
-                            data-id="${key}" title="שמור סיסמה חדשה">
-                        <i data-feather="check" class="w-4 h-4"></i>
-                    </button>
+                            data-id="${key}" title="שמור סיסמה חדשה"><i data-feather="check" class="w-4 h-4"></i></button>
                 </div>
             </td>
             <td class="p-3 text-center">
-                <button class="del-usr text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded transition" data-id="${key}" title="מחק משתמש">
-                    <i data-feather="trash-2" class="w-4 h-4"></i>
-                </button>
+                <button class="del-usr text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded transition" data-id="${key}"><i data-feather="trash-2" class="w-4 h-4"></i></button>
             </td>`;
         list.appendChild(row);
     });
     feather.replace();
     
-    // Event: Delete User
     document.querySelectorAll('.del-usr').forEach(btn => btn.addEventListener('click', e => {
         if(confirm("למחוק את המשתמש?")) remove(ref(db, `users/${e.currentTarget.dataset.id}`));
     }));
 
-    // Event: Update Password (NEW)
     document.querySelectorAll('.save-pass-btn').forEach(btn => btn.addEventListener('click', e => {
         const uid = e.currentTarget.dataset.id;
         const newPass = document.getElementById(`pass-${uid}`).value.trim();
-        
-        if(newPass) {
-            update(ref(db, `users/${uid}`), { password: newPass })
-                .then(() => {
-                    // Visual feedback
-                    const btnIcon = e.currentTarget.querySelector('svg'); // feather icon
-                    e.currentTarget.classList.add('bg-green-100', 'text-green-600');
-                    setTimeout(() => {
-                        e.currentTarget.classList.remove('bg-green-100', 'text-green-600');
-                    }, 1000);
-                });
-        } else {
-            alert("סיסמה לא יכולה להיות ריקה");
-        }
+        if(newPass) update(ref(db, `users/${uid}`), { password: newPass });
     }));
 }
 
@@ -162,7 +141,7 @@ function renderGamesList() {
 }
 
 // ------------------------------------------------------------------
-// 3. BONUS QUESTIONS
+// 3. BONUS QUESTIONS (UPDATED WITH START BUTTON)
 // ------------------------------------------------------------------
 const bonusInput = document.getElementById('bonus-question');
 const bonusList = document.getElementById('bonus-list');
@@ -170,7 +149,7 @@ const bonusList = document.getElementById('bonus-list');
 document.getElementById('add-bonus-btn').addEventListener('click', () => {
     const q = bonusInput.value.trim();
     if(!q) return;
-    set(push(ref(db, 'bonus_questions')), { question: q });
+    set(push(ref(db, 'bonus_questions')), { question: q, started: false }); // Added started: false
     bonusInput.value = ''; bonusInput.focus();
 });
 
@@ -184,12 +163,25 @@ function renderBonusList() {
         const item = bonusData[key];
         const div = document.createElement('div');
         div.className = "flex justify-between items-center bg-yellow-50/50 p-2 rounded border border-yellow-100";
+        
+        // Added Start Button Logic here
         div.innerHTML = `
-            <span class="font-bold text-gray-700 text-sm">${item.question}</span>
+            <div class="flex items-center gap-3">
+                <span class="font-bold text-gray-700 text-sm">${item.question}</span>
+                ${item.started ? 
+                    `<span class="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">פעיל</span>` : 
+                    `<button class="start-bonus text-green-600 border border-green-200 bg-white px-2 py-0.5 rounded text-[10px] hover:bg-green-50 font-bold" data-id="${key}">התחל</button>`}
+            </div>
             <button class="del-bonus text-red-400 hover:text-red-600 p-1" data-id="${key}"><i data-feather="trash-2" class="w-4 h-4"></i></button>`;
         bonusList.appendChild(div);
     });
     feather.replace();
+    
+    // Listeners for Start Bonus
+    document.querySelectorAll('.start-bonus').forEach(b => b.addEventListener('click', e => {
+        update(ref(db, `bonus_questions/${e.currentTarget.dataset.id}`), { started: true });
+    }));
+
     document.querySelectorAll('.del-bonus').forEach(b => b.addEventListener('click', e => {
         if(confirm("למחוק?")) {
             const id = e.currentTarget.dataset.id;
@@ -207,7 +199,7 @@ document.getElementById('archive-round-btn').addEventListener('click', () => {
     if (!confirm(`לשמור את "${name}"?`)) return;
 
     const results = {};
-    Object.keys(usersData).forEach(uid => results[uid] = usersData[uid].bonusPoints || 0); // Start with bonus points
+    Object.keys(usersData).forEach(uid => results[uid] = usersData[uid].bonusPoints || 0);
 
     Object.keys(gamesData).forEach(gid => {
         const score = scoresData[gid];
@@ -240,10 +232,9 @@ function renderManualEntryForm() {
     manualRowsContainer.innerHTML = '';
     if(!usersData) return;
     Object.keys(usersData).forEach(uid => {
-        addManualRow(); // Logic for dynamic rows is better handled by button, but here we can populate defaults
+        addManualRow(); 
     });
 }
-// Add row manually
 document.getElementById('add-manual-row-btn').addEventListener('click', () => {
     const div = document.createElement('div');
     div.className = "flex items-center gap-2 manual-row animate-fade-in mb-2";
@@ -303,12 +294,10 @@ function renderHistoryList() {
     }));
 }
 
-// RESET
 document.getElementById('reset-day-btn').addEventListener('click', () => {
     if(confirm("למחוק הכל מהיום (כולל בונוסים)?")) {
         remove(ref(db, 'games')); remove(ref(db, 'scores')); remove(ref(db, 'bets')); 
         remove(ref(db, 'bonus_questions')); remove(ref(db, 'bonus_bets'));
-        // Also reset bonus points for users
         if(usersData) {
             Object.keys(usersData).forEach(uid => update(ref(db, `users/${uid}`), { bonusPoints: 0 }));
         }
