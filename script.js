@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
+// !!! PASTE CONFIG HERE !!!
 const firebaseConfig = {
   apiKey: "AIzaSyCICNrNm1pxT3FjAHQPRCtXM-ei63dT8yY",
   authDomain: "ucl-bets.firebaseapp.com",
@@ -20,6 +21,8 @@ let usersData = {};
 let gamesData = {};
 let scoresData = {};
 let betsData = {};
+let bonusQuestions = {};
+let bonusBets = {};
 
 // DOM Elements
 const loginScreen = document.getElementById('login-screen');
@@ -76,20 +79,13 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 function startAppListeners() {
     feather.replace();
 
-    onValue(ref(db, 'games'), (snapshot) => {
-        gamesData = snapshot.val() || {};
-        renderAll();
-    });
-
-    onValue(ref(db, 'scores'), (snapshot) => {
-        scoresData = snapshot.val() || {};
-        renderAll();
-    });
-
-    onValue(ref(db, 'bets'), (snapshot) => {
-        betsData = snapshot.val() || {};
-        renderAll();
-    });
+    onValue(ref(db, 'games'), (s) => { gamesData = s.val() || {}; renderAll(); });
+    onValue(ref(db, 'scores'), (s) => { scoresData = s.val() || {}; renderAll(); });
+    onValue(ref(db, 'bets'), (s) => { betsData = s.val() || {}; renderAll(); });
+    
+    // Listen for Bonuses
+    onValue(ref(db, 'bonus_questions'), (s) => { bonusQuestions = s.val() || {}; renderAll(); });
+    onValue(ref(db, 'bonus_bets'), (s) => { bonusBets = s.val() || {}; renderAll(); });
 }
 
 // -----------------------------------------------------------------------------
@@ -100,16 +96,25 @@ function renderAll() {
     
     const sortedUsers = Object.keys(usersData).map(key => ({
         id: key,
-        name: usersData[key].name
+        name: usersData[key].name,
+        bonusPoints: usersData[key].bonusPoints || 0 // Get stored bonus points
     })).sort((a, b) => a.name.localeCompare(b.name));
 
+    // 1. Render Games
     if (gamesData) {
         Object.keys(gamesData).forEach(gameId => {
             renderGameBlock(gameId, gamesData[gameId], sortedUsers);
         });
     }
 
+    // 2. Render Bonus Questions Section
+    if (Object.keys(bonusQuestions).length > 0) {
+        renderBonusSection(sortedUsers);
+    }
+
+    // 3. Calculate Leaderboard
     calculateLeaderboard(sortedUsers);
+    
     feather.replace();
 }
 
@@ -117,11 +122,9 @@ function renderGameBlock(gameId, game, sortedUsers) {
     const block = document.createElement('div');
     block.className = "match-block bg-white rounded-xl shadow-md overflow-hidden mb-6 border border-gray-100";
 
-    // *** LOGIC CHANGE: Status determines visibility, not just score ***
     const isStarted = (game.started === true); 
     const realScore = scoresData[gameId];
 
-    // 1. Build Header Row
     let headerHTML = '';
     sortedUsers.forEach(u => {
         const isMe = (u.id === currentUser.key);
@@ -129,7 +132,6 @@ function renderGameBlock(gameId, game, sortedUsers) {
         headerHTML += `<div class="p-2 border-r border-b border-gray-200 text-center font-bold text-xs sm:text-sm whitespace-nowrap ${bgClass}">${u.name}</div>`;
     });
 
-    // 2. Build Betting Cells
     let betsHTML = '';
     sortedUsers.forEach(u => {
         const isMe = (u.id === currentUser.key);
@@ -144,27 +146,19 @@ function renderGameBlock(gameId, game, sortedUsers) {
         let cellContent = '';
         let cellClass = 'bg-white';
 
-        // CASE A: It's ME
         if (isMe) {
             if (isStarted) {
-                // Game Started -> Read Only (Lock betting)
                 cellContent = `<span class="font-bold text-gray-800 text-lg">${betHome} : ${betAway}</span>`;
             } else {
-                // Game Not Started -> Editable
                 cellContent = `
                     <input type="number" class="my-bet-home w-8 text-center text-sm border border-blue-200 bg-blue-50 rounded p-1 text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="-" value="${betHome}">
                     <span class="text-blue-300">:</span>
                     <input type="number" class="my-bet-away w-8 text-center text-sm border border-blue-200 bg-blue-50 rounded p-1 text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="-" value="${betAway}">
                 `;
             }
-        } 
-        // CASE B: It's OTHERS
-        else {
+        } else {
             if (isStarted) {
-                // Game Started -> Reveal Bets!
                 cellContent = `<span class="font-bold text-gray-800">${betHome} : ${betAway}</span>`;
-                
-                // Color Logic
                 if (realScore && betHome !== '' && betAway !== '') {
                     const points = getPoints(realScore.home, realScore.away, betHome, betAway);
                     if (points === 3) cellClass = 'bg-green-600 text-white';
@@ -172,18 +166,13 @@ function renderGameBlock(gameId, game, sortedUsers) {
                     else cellClass = 'bg-red-200';
                 }
             } else {
-                // Game Not Started -> Hide
                 const hasBet = (betHome !== '' && betAway !== '');
-                if (hasBet) {
-                     cellContent = `<i data-feather="check-circle" class="w-5 h-5 text-green-500 opacity-50"></i>`;
-                } else {
-                     cellContent = `<i data-feather="lock" class="w-4 h-4 text-gray-300"></i>`;
-                }
+                cellContent = hasBet ? `<i data-feather="check-circle" class="w-5 h-5 text-green-500 opacity-50"></i>` : `<i data-feather="lock" class="w-4 h-4 text-gray-300"></i>`;
                 cellClass = "bg-gray-50";
             }
         }
 
-        // Color Logic for ME (if started)
+        // Color for ME if started
         if (isMe && isStarted && realScore && betHome !== '' && betAway !== '') {
              const points = getPoints(realScore.home, realScore.away, betHome, betAway);
              if (points === 3) cellClass = 'bg-green-600 text-white';
@@ -198,9 +187,6 @@ function renderGameBlock(gameId, game, sortedUsers) {
         `;
     });
 
-    // Score Inputs - Controlled by isStarted
-    // If NOT started -> Disabled & Grey
-    // If Started -> Enabled & White
     const scoreDisabled = isStarted ? '' : 'disabled';
     const scoreBg = isStarted ? 'bg-white' : 'bg-gray-100 cursor-not-allowed';
 
@@ -229,72 +215,117 @@ function renderGameBlock(gameId, game, sortedUsers) {
 
     container.appendChild(block);
 
-    // EVENTS
-    
-    // My Bet Input
+    // Event Listeners (Same as before)
     const myHomeIn = block.querySelector('.my-bet-home');
     const myAwayIn = block.querySelector('.my-bet-away');
-    
     if (myHomeIn && myAwayIn) {
-        const sendBet = () => {
-            set(ref(db, `bets/${gameId}/${currentUser.key}`), {
-                home: myHomeIn.value,
-                away: myAwayIn.value
-            });
-        };
-        myHomeIn.addEventListener('input', sendBet);
-        myAwayIn.addEventListener('input', sendBet);
+        const sendBet = () => set(ref(db, `bets/${gameId}/${currentUser.key}`), { home: myHomeIn.value, away: myAwayIn.value });
+        myHomeIn.addEventListener('input', sendBet); myAwayIn.addEventListener('input', sendBet);
     }
-
-    // Real Score Input
-    const realH = block.querySelector('.real-score-home');
-    const realA = block.querySelector('.real-score-away');
     
-    // Only attach listener if enabled
     if (isStarted) {
-        const sendScore = () => {
-            set(ref(db, `scores/${gameId}`), {
-                home: realH.value,
-                away: realA.value
-            });
-        };
-        realH.addEventListener('input', sendScore);
-        realA.addEventListener('input', sendScore);
+        const realH = block.querySelector('.real-score-home');
+        const realA = block.querySelector('.real-score-away');
+        const sendScore = () => set(ref(db, `scores/${gameId}`), { home: realH.value, away: realA.value });
+        realH.addEventListener('input', sendScore); realA.addEventListener('input', sendScore);
     }
 }
 
 // -----------------------------------------------------------------------------
-// 4. UTILS & CALC
+// 4. BONUS RENDERING
 // -----------------------------------------------------------------------------
+function renderBonusSection(sortedUsers) {
+    const bonusContainer = document.createElement('div');
+    bonusContainer.className = "mt-12 bg-yellow-50 rounded-xl p-6 border-t-4 border-yellow-400";
+    
+    let html = `<h2 class="text-xl font-bold text-yellow-800 mb-6 flex items-center gap-2"><i data-feather="star"></i> שאלות בונוס</h2>`;
+    
+    Object.keys(bonusQuestions).forEach(qid => {
+        const question = bonusQuestions[qid].question;
+        const myAnswer = (bonusBets[qid] && bonusBets[qid][currentUser.key]) ? bonusBets[qid][currentUser.key] : '';
+        
+        // Header Row
+        let usersHeader = '';
+        let answersRow = '';
+        
+        sortedUsers.forEach(u => {
+            const isMe = (u.id === currentUser.key);
+            const userAnswer = (bonusBets[qid] && bonusBets[qid][u.id]) ? bonusBets[qid][u.id] : '';
+            const bgClass = isMe ? 'bg-yellow-100 text-yellow-900' : 'bg-white text-gray-500';
+            
+            usersHeader += `<div class="p-2 border-b text-center text-xs font-bold ${bgClass}">${u.name}</div>`;
+            
+            // Content
+            let content = '';
+            if (isMe) {
+                // Editable Text Area for Me
+                content = `<input type="text" class="bonus-input w-full text-center text-sm border-0 bg-transparent focus:ring-0 p-1 font-bold text-gray-900" placeholder="..." value="${userAnswer}" data-qid="${qid}">`;
+            } else {
+                // Read Only for Others (Always visible or hidden? Let's keep visible for fun, or hidden if you want)
+                // Let's keep it visible for bonus bets as they are usually funny
+                content = `<span class="text-xs text-gray-800">${userAnswer || '-'}</span>`;
+            }
+            
+            answersRow += `<div class="p-2 border-r last:border-0 flex items-center justify-center min-h-[40px] bg-white">${content}</div>`;
+        });
 
+        html += `
+            <div class="mb-8 shadow-sm rounded-lg overflow-hidden border border-yellow-200">
+                <div class="bg-yellow-200 p-3 font-bold text-yellow-900 text-center">${question}</div>
+                <div class="overflow-x-auto">
+                    <div class="grid" style="grid-template-columns: repeat(${sortedUsers.length}, minmax(100px, 1fr));">
+                        ${usersHeader}
+                        ${answersRow}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    bonusContainer.innerHTML = html;
+    container.appendChild(bonusContainer);
+
+    // Event Listeners for Bonus Inputs
+    bonusContainer.querySelectorAll('.bonus-input').forEach(input => {
+        input.addEventListener('change', (e) => { // 'change' saves on enter/blur
+            const qid = e.target.dataset.qid;
+            const val = e.target.value;
+            set(ref(db, `bonus_bets/${qid}/${currentUser.key}`), val);
+        });
+    });
+}
+
+// -----------------------------------------------------------------------------
+// 5. LEADERBOARD & CALC
+// -----------------------------------------------------------------------------
 function getPoints(rH, rA, bH, bA) {
     if (rH === '' || rA === '' || bH === '' || bA === '') return 0;
-    
-    rH = Number(rH); rA = Number(rA);
-    bH = Number(bH); bA = Number(bA);
-
+    rH = Number(rH); rA = Number(rA); bH = Number(bH); bA = Number(bA);
     if (rH === bH && rA === bA) return 3; 
     if ((bH > bA && rH > rA) || (bH < bA && rH < rA) || (bH === bA && rH === rA)) return 1; 
-    
     return 0;
 }
 
 function calculateLeaderboard(sortedUsers) {
-    const leaderboard = sortedUsers.map(u => ({ name: u.name, points: 0, exact: 0, direction: 0 }));
+    const leaderboard = sortedUsers.map(u => ({ 
+        id: u.id,
+        name: u.name, 
+        points: 0, 
+        exact: 0, 
+        direction: 0,
+        bonus: u.bonusPoints || 0 // Start with stored bonus
+    }));
 
     if (gamesData) {
         Object.keys(gamesData).forEach(gameId => {
             const game = gamesData[gameId];
             const realScore = scoresData[gameId];
-            
-            // Only calc points if game started AND has score
             if (!game.started || !realScore || realScore.home === '' || realScore.away === '') return;
 
             sortedUsers.forEach((u, index) => {
                 if (betsData[gameId] && betsData[gameId][u.id]) {
                     const bet = betsData[gameId][u.id];
                     const pts = getPoints(realScore.home, realScore.away, bet.home, bet.away);
-                    
                     leaderboard[index].points += pts;
                     if (pts === 3) leaderboard[index].exact++;
                     if (pts === 1) leaderboard[index].direction++;
@@ -303,8 +334,23 @@ function calculateLeaderboard(sortedUsers) {
         });
     }
 
+    // Add Bonus Points to Total
+    leaderboard.forEach(p => {
+        p.points += p.bonus;
+    });
+
     leaderboard.sort((a, b) => b.points - a.points);
     const tbody = document.getElementById('leaderboard-body');
+    const headerRow = document.querySelector('#leaderboard-body').parentElement.querySelector('tr');
+    
+    // Add Bonus Header if missing
+    if (!headerRow.querySelector('.bonus-head')) {
+        const th = document.createElement('th');
+        th.className = "p-2 bonus-head text-yellow-600";
+        th.innerText = "בונוס";
+        headerRow.appendChild(th);
+    }
+
     tbody.innerHTML = '';
 
     leaderboard.forEach((p, i) => {
@@ -323,7 +369,27 @@ function calculateLeaderboard(sortedUsers) {
             <td class="p-3 text-lg text-blue-600 font-bold">${p.points}</td>
             <td class="p-3 text-sm text-green-700 font-normal bg-green-50 rounded">${p.exact}</td>
             <td class="p-3 text-sm text-gray-500 font-normal">${p.direction}</td>
+            <td class="p-3 flex items-center justify-center gap-1">
+                <button class="bonus-btn-minus bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-500 w-6 h-6 rounded text-xs" data-uid="${p.id}">-</button>
+                <span class="text-sm font-bold text-yellow-600 w-4 text-center">${p.bonus}</span>
+                <button class="bonus-btn-plus bg-gray-100 hover:bg-green-100 text-gray-500 hover:text-green-500 w-6 h-6 rounded text-xs" data-uid="${p.id}">+</button>
+            </td>
         `;
         tbody.appendChild(row);
+    });
+
+    // Attach Bonus Button Events
+    document.querySelectorAll('.bonus-btn-plus').forEach(btn => {
+        btn.addEventListener('click', (e) => updateBonus(e.target.dataset.uid, 1));
+    });
+    document.querySelectorAll('.bonus-btn-minus').forEach(btn => {
+        btn.addEventListener('click', (e) => updateBonus(e.target.dataset.uid, -1));
+    });
+}
+
+function updateBonus(uid, change) {
+    const currentBonus = usersData[uid].bonusPoints || 0;
+    update(ref(db, `users/${uid}`), {
+        bonusPoints: currentBonus + change
     });
 }
