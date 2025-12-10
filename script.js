@@ -11,7 +11,6 @@ const firebaseConfig = {
   messagingSenderId: "520474072792",
   appId: "1:520474072792:web:0beb13263d2b9a03d0a9ad"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
@@ -21,27 +20,26 @@ feather.replace();
 const participants = ["אלעד", "רז", "יהלי", "שקד", "אורי", "יותם", "עינב", "בוכ", "תומר"];
 const container = document.getElementById('matches-container');
 
-// Global Data Storage
+// Global Data
 let gamesData = {};
 let scoresData = {};
 let betsData = {};
 
 // -----------------------------------------------------------------------------
-// 1. ADMIN LOGIC (Add / Remove Games)
+// 1. ADMIN LOGIC
 // -----------------------------------------------------------------------------
 document.getElementById('add-game-btn').addEventListener('click', () => {
     const homeTeam = document.getElementById('new-home').value;
     const awayTeam = document.getElementById('new-away').value;
 
     if (homeTeam && awayTeam) {
-        const newGameRef = push(ref(db, 'games')); // Create new entry in DB
+        const newGameRef = push(ref(db, 'games')); 
         set(newGameRef, {
             home: homeTeam,
             away: awayTeam,
             timestamp: Date.now()
         });
         
-        // Clear inputs
         document.getElementById('new-home').value = '';
         document.getElementById('new-away').value = '';
     } else {
@@ -49,7 +47,6 @@ document.getElementById('add-game-btn').addEventListener('click', () => {
     }
 });
 
-// Clear all data for a new day
 document.getElementById('clear-all-btn').addEventListener('click', () => {
     if(confirm("בטוח שרוצים למחוק הכל ולהתחיל יום חדש?")) {
         remove(ref(db, 'games'));
@@ -60,33 +57,27 @@ document.getElementById('clear-all-btn').addEventListener('click', () => {
 });
 
 // -----------------------------------------------------------------------------
-// 2. MAIN APP LOGIC (Listen to DB)
+// 2. MAIN APP LOGIC
 // -----------------------------------------------------------------------------
-
-// Listen for Games
 onValue(ref(db, 'games'), (snapshot) => {
-    container.innerHTML = ''; // Clear current list to prevent duplicates
+    container.innerHTML = ''; 
     gamesData = snapshot.val() || {};
     
     if (!gamesData) return;
 
-    // Render each game
     Object.keys(gamesData).forEach(gameId => {
         const game = gamesData[gameId];
         renderGameBlock(gameId, game);
     });
     
-    // Re-apply icons for new elements
     feather.replace();
 });
 
-// Listen for Scores
 onValue(ref(db, 'scores'), (snapshot) => {
     scoresData = snapshot.val() || {};
     recalculateAll();
 });
 
-// Listen for Bets
 onValue(ref(db, 'bets'), (snapshot) => {
     betsData = snapshot.val() || {};
     recalculateAll();
@@ -94,34 +85,32 @@ onValue(ref(db, 'bets'), (snapshot) => {
 
 
 // -----------------------------------------------------------------------------
-// 3. RENDERING (Create HTML dynamically)
+// 3. RENDERING (THE FIX IS HERE)
 // -----------------------------------------------------------------------------
 function renderGameBlock(gameId, game) {
     const block = document.createElement('div');
     block.className = "match-block bg-white rounded-xl shadow-md overflow-hidden animate-fade-in";
     block.dataset.id = gameId;
 
-    // Build the Grid Header (Names)
     let headerHTML = '';
     participants.forEach(p => {
-        headerHTML += `<div class="p-2 border-r border-b border-gray-200 text-center font-bold bg-gray-50 text-xs sm:text-sm">${p}</div>`;
+        headerHTML += `<div class="p-2 border-r border-b border-gray-200 text-center font-bold bg-gray-50 text-xs sm:text-sm whitespace-nowrap">${p}</div>`;
     });
 
-    // Build the Grid Betting Inputs
     let betsHTML = '';
     participants.forEach(p => {
-        // We create TWO inputs per person (Home/Away)
         betsHTML += `
-            <div class="bet-cell bg-white p-2 border-r border-b border-gray-200 flex items-center justify-center gap-1 transition-colors duration-300" data-player="${p}">
-                <input type="number" class="bet-input-home w-6 text-center text-sm border border-gray-200 rounded focus:border-blue-500 outline-none" placeholder="-">
+            <div class="bet-cell bg-white p-2 border-r border-b border-gray-200 flex items-center justify-center gap-1 transition-colors duration-300 min-h-[50px]" data-player="${p}">
+                <input type="number" class="bet-input-home w-8 text-center text-sm border border-gray-200 rounded focus:border-blue-500 outline-none p-1" placeholder="-">
                 <span class="text-gray-300">:</span>
-                <input type="number" class="bet-input-away w-6 text-center text-sm border border-gray-200 rounded focus:border-blue-500 outline-none" placeholder="-">
+                <input type="number" class="bet-input-away w-8 text-center text-sm border border-gray-200 rounded focus:border-blue-500 outline-none p-1" placeholder="-">
             </div>
         `;
     });
 
+    // *** FIX: Added 'overflow-x-auto' wrapper and 'min-w-[800px]' to grid ***
     block.innerHTML = `
-        <div class="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white sticky left-0 right-0">
             <h3 class="text-xl font-bold text-gray-800">${game.home} - ${game.away}</h3>
             <div class="flex items-center gap-2 bg-gray-100 p-2 rounded-lg ltr">
                 <input type="number" class="real-score-away w-10 text-center border border-gray-300 rounded p-1" placeholder="-">
@@ -130,21 +119,21 @@ function renderGameBlock(gameId, game) {
                 <span class="text-sm text-gray-500 font-bold ml-2">תוצאה:</span>
             </div>
         </div>
-        <div class="grid grid-cols-9 gap-0">
-            ${headerHTML}
-            ${betsHTML}
+        
+        <div class="overflow-x-auto">
+            <div class="grid grid-cols-9 gap-0 min-w-[800px]">
+                ${headerHTML}
+                ${betsHTML}
+            </div>
         </div>
     `;
 
     container.appendChild(block);
 
-    // ATTACH EVENTS (Listeners for Inputs)
-    
-    // 1. Real Score Inputs
+    // ATTACH EVENTS
     const scoreHomeInput = block.querySelector('.real-score-home');
     const scoreAwayInput = block.querySelector('.real-score-away');
 
-    // Fill existing score if available
     if (scoresData[gameId]) {
         scoreHomeInput.value = scoresData[gameId].home;
         scoreAwayInput.value = scoresData[gameId].away;
@@ -159,13 +148,11 @@ function renderGameBlock(gameId, game) {
     scoreHomeInput.addEventListener('input', sendScore);
     scoreAwayInput.addEventListener('input', sendScore);
 
-    // 2. Betting Inputs
     block.querySelectorAll('.bet-cell').forEach(cell => {
         const player = cell.dataset.player;
         const homeIn = cell.querySelector('.bet-input-home');
         const awayIn = cell.querySelector('.bet-input-away');
 
-        // Fill existing bets if available
         if (betsData[gameId] && betsData[gameId][player]) {
             homeIn.value = betsData[gameId][player].home;
             awayIn.value = betsData[gameId][player].away;
@@ -182,42 +169,34 @@ function renderGameBlock(gameId, game) {
     });
 }
 
-
 // -----------------------------------------------------------------------------
-// 4. CALCULATIONS (Coloring & Leaderboard)
+// 4. CALCULATIONS
 // -----------------------------------------------------------------------------
 function recalculateAll() {
-    // We calculate everything from scratch based on the 3 global objects
     const leaderboard = {};
     participants.forEach(p => leaderboard[p] = { points: 0, exact: 0, direction: 0 });
 
-    // Loop through every rendered game block
     document.querySelectorAll('.match-block').forEach(block => {
         const gameId = block.dataset.id;
         const realScore = scoresData[gameId];
         
-        // Update Score Inputs visual
         if (realScore) {
             block.querySelector('.real-score-home').value = realScore.home;
             block.querySelector('.real-score-away').value = realScore.away;
         }
 
-        // Loop through betting cells
         block.querySelectorAll('.bet-cell').forEach(cell => {
             const player = cell.dataset.player;
             const homeIn = cell.querySelector('.bet-input-home');
             const awayIn = cell.querySelector('.bet-input-away');
 
-            // Update Input Values from DB
             if (betsData[gameId] && betsData[gameId][player]) {
                 homeIn.value = betsData[gameId][player].home;
                 awayIn.value = betsData[gameId][player].away;
             }
 
-            // --- COLOR LOGIC ---
-            // Reset Colors
             cell.classList.remove('bg-green-700', 'bg-green-300', 'text-white', 'bg-white');
-            cell.classList.add('bg-white'); // default
+            cell.classList.add('bg-white'); 
             homeIn.classList.remove('text-white');
             awayIn.classList.remove('text-white');
 
@@ -227,7 +206,6 @@ function recalculateAll() {
                 const bH = Number(homeIn.value);
                 const bA = Number(awayIn.value);
 
-                // Exact
                 if (rH === bH && rA === bA) {
                     cell.classList.remove('bg-white');
                     cell.classList.add('bg-green-700', 'text-white');
@@ -236,7 +214,6 @@ function recalculateAll() {
                     leaderboard[player].points += 3;
                     leaderboard[player].exact += 1;
                 }
-                // Direction
                 else if (
                     (bH > bA && rH > rA) ||
                     (bH < bA && rH < rA) ||
