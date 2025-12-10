@@ -397,7 +397,9 @@ function createFallingBackground() {
         'assets/item1.png', 
         'assets/item2.png', 
         'assets/item3.png', 
-        'assets/item4.png' 
+        'assets/item4.png',
+      'assets/item5.png',
+      'assets/item6.png'
     ];
 
     function spawnItem() {
