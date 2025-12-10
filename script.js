@@ -11,6 +11,7 @@ const firebaseConfig = {
   messagingSenderId: "520474072792",
   appId: "1:520474072792:web:0beb13263d2b9a03d0a9ad"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
@@ -35,7 +36,7 @@ const container = document.getElementById('matches-container');
 // -----------------------------------------------------------------------------
 onValue(ref(db, 'users'), (snapshot) => {
     usersData = snapshot.val() || {};
-    if (currentUser) renderAll(); // Re-render structure if users change
+    if (currentUser) renderAll();
 });
 
 loginBtn.addEventListener('click', attemptLogin);
@@ -73,59 +74,55 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 
 
 // -----------------------------------------------------------------------------
-// 2. DATA LISTENERS (SMART SPLIT)
+// 2. DATA LISTENERS
 // -----------------------------------------------------------------------------
 function startAppListeners() {
     feather.replace();
 
-    // STRUCTURAL CHANGES -> Full Re-render
     onValue(ref(db, 'games'), (s) => { gamesData = s.val() || {}; renderAll(); });
     onValue(ref(db, 'bonus_questions'), (s) => { bonusQuestions = s.val() || {}; renderAll(); });
 
-    // VALUE CHANGES -> Update Only (No Re-render)
     onValue(ref(db, 'scores'), (s) => { scoresData = s.val() || {}; recalculateAll(); });
     onValue(ref(db, 'bets'), (s) => { betsData = s.val() || {}; recalculateAll(); });
     onValue(ref(db, 'bonus_bets'), (s) => { bonusBets = s.val() || {}; recalculateAll(); });
 }
 
 // -----------------------------------------------------------------------------
-// 3. CORE RENDERING LOOP (Builds HTML)
+// 3. CORE RENDERING LOOP
 // -----------------------------------------------------------------------------
 function renderAll() {
     container.innerHTML = '';
     
-    const sortedUsers = Object.keys(usersData).map(key => ({
-        id: key,
-        name: usersData[key].name,
-        bonusPoints: usersData[key].bonusPoints || 0
-    })).sort((a, b) => a.name.localeCompare(b.name));
+    // *** FILTER: ONLY ACTIVE USERS ***
+    const sortedUsers = Object.keys(usersData)
+        .filter(key => usersData[key].active !== false) // Only show if active is true (or undefined)
+        .map(key => ({
+            id: key,
+            name: usersData[key].name,
+            bonusPoints: usersData[key].bonusPoints || 0
+        })).sort((a, b) => a.name.localeCompare(b.name));
 
-    // 1. Render Games
     if (gamesData) {
         Object.keys(gamesData).forEach(gameId => {
             renderGameBlock(gameId, gamesData[gameId], sortedUsers);
         });
     }
 
-    // 2. Render Bonus Section
     if (Object.keys(bonusQuestions).length > 0) {
         renderBonusSection(sortedUsers);
     }
 
-    // 3. Calculate (Apply values and colors)
     recalculateAll();
-    
     feather.replace();
 }
 
 function renderGameBlock(gameId, game, sortedUsers) {
     const block = document.createElement('div');
     block.className = "match-block bg-white rounded-xl shadow-md overflow-hidden mb-6 border border-gray-100";
-    block.dataset.id = gameId; // Important for updates
+    block.dataset.id = gameId;
 
     const isStarted = (game.started === true); 
     
-    // Header
     let headerHTML = '';
     sortedUsers.forEach(u => {
         const isMe = (u.id === currentUser.key);
@@ -133,7 +130,6 @@ function renderGameBlock(gameId, game, sortedUsers) {
         headerHTML += `<div class="p-2 border-r border-b border-gray-200 text-center font-bold text-xs sm:text-sm whitespace-nowrap ${bgClass}">${u.name}</div>`;
     });
 
-    // Betting Cells
     let betsHTML = '';
     sortedUsers.forEach(u => {
         const isMe = (u.id === currentUser.key);
@@ -154,7 +150,6 @@ function renderGameBlock(gameId, game, sortedUsers) {
             if (isStarted) {
                 cellContent = `<span class="bet-display font-bold text-gray-800"></span>`;
             } else {
-                // Determine lock/check via JS update to avoid flicker
                 cellContent = `<span class="secret-icon"><i data-feather="lock" class="w-4 h-4 text-gray-300"></i></span>`;
                 cellClass = "bg-gray-50";
             }
@@ -195,7 +190,6 @@ function renderGameBlock(gameId, game, sortedUsers) {
 
     container.appendChild(block);
 
-    // Event Listeners
     const myHomeIn = block.querySelector('.my-bet-home');
     const myAwayIn = block.querySelector('.my-bet-away');
     if (myHomeIn && myAwayIn) {
@@ -277,15 +271,17 @@ function renderBonusSection(sortedUsers) {
 }
 
 // -----------------------------------------------------------------------------
-// 4. SMART UPDATES (THE FIX)
+// 4. SMART UPDATES
 // -----------------------------------------------------------------------------
 function recalculateAll() {
-    // Need users list for leaderboard order
-    const sortedUsers = Object.keys(usersData).map(key => ({
-        id: key, 
-        name: usersData[key].name,
-        bonusPoints: usersData[key].bonusPoints || 0
-    })).sort((a, b) => a.name.localeCompare(b.name));
+    // *** FILTER: ONLY ACTIVE USERS ***
+    const sortedUsers = Object.keys(usersData)
+        .filter(key => usersData[key].active !== false) // Filter here too
+        .map(key => ({
+            id: key, 
+            name: usersData[key].name,
+            bonusPoints: usersData[key].bonusPoints || 0
+        })).sort((a, b) => a.name.localeCompare(b.name));
 
     const leaderboard = sortedUsers.map(u => ({ 
         id: u.id, name: u.name, points: 0, exact: 0, direction: 0, bonus: u.bonusPoints 
@@ -298,7 +294,7 @@ function recalculateAll() {
         const realScore = scoresData[gameId];
         const isStarted = game && game.started;
 
-        // Update Score Inputs (Only if not focused!)
+        // Update Score Inputs
         const realH = block.querySelector('.real-score-home');
         const realA = block.querySelector('.real-score-away');
         if (realScore) {
@@ -306,7 +302,6 @@ function recalculateAll() {
             if (document.activeElement !== realA) realA.value = realScore.away;
         }
 
-        // Loop Bet Cells
         block.querySelectorAll('.bet-cell').forEach(cell => {
             const uid = cell.dataset.uid;
             const isMe = (uid === currentUser.key);
@@ -317,7 +312,6 @@ function recalculateAll() {
                 betAway = betsData[gameId][uid].away;
             }
 
-            // Update Values in DOM
             if (isMe) {
                 if (isStarted) {
                     const span = cell.querySelector('.bet-display');
@@ -333,7 +327,6 @@ function recalculateAll() {
                     const span = cell.querySelector('.bet-display');
                     if (span) span.innerText = `${betHome} : ${betAway}`;
                 } else {
-                    // Update lock icon state (Check or Lock)
                     const hasBet = (betHome !== '' && betAway !== '');
                     const iconSpan = cell.querySelector('.secret-icon');
                     if (iconSpan) {
@@ -345,18 +338,15 @@ function recalculateAll() {
                 }
             }
 
-            // Colors & Points
             cell.classList.remove('bg-green-700', 'bg-green-300', 'bg-red-200', 'bg-white', 'text-white'); 
-            cell.classList.add('bg-white'); // Default
+            cell.classList.add('bg-white'); 
             
-            // Force text black on inputs if cleaned
             const inputs = cell.querySelectorAll('input');
             inputs.forEach(i => { i.classList.remove('text-white'); i.classList.add('text-gray-900'); });
 
             if (isStarted && realScore && realScore.home !== '' && realScore.away !== '' && betHome !== '' && betAway !== '') {
                 const pts = getPoints(realScore.home, realScore.away, betHome, betAway);
                 
-                // Add points to leaderboard
                 const userStat = leaderboard.find(u => u.id === uid);
                 if (userStat) {
                     userStat.points += pts;
@@ -364,12 +354,10 @@ function recalculateAll() {
                     if (pts === 1) userStat.direction++;
                 }
 
-                // Apply Colors (Only for me or if game started)
                 if (isMe || isStarted) {
                     cell.classList.remove('bg-white');
                     if (pts === 3) {
-                        cell.classList.add('bg-green-700', 'text-white'); // Green bg, White Text for container
-                        // Inputs inside might need white text if it's me
+                        cell.classList.add('bg-green-700', 'text-white');
                         inputs.forEach(i => { i.classList.remove('text-gray-900'); i.classList.add('text-white'); });
                     }
                     else if (pts === 1) cell.classList.add('bg-green-300');
@@ -417,7 +405,6 @@ function recalculateAll() {
         }
     });
 
-    // UPDATE LEADERBOARD
     leaderboard.forEach(p => p.points += p.bonus);
     leaderboard.sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
