@@ -37,7 +37,7 @@ onValue(ref(db, 'bonus_questions'), snapshot => { bonusData = snapshot.val() || 
 onValue(ref(db, 'history'), snapshot => { historyData = snapshot.val() || {}; renderHistoryList(); });
 
 // ------------------------------------------------------------------
-// 1. MANAGE USERS
+// 1. MANAGE USERS (ACTIVE TOGGLE ADDED)
 // ------------------------------------------------------------------
 const userNameIn = document.getElementById('user-name');
 const userPassIn = document.getElementById('user-pass');
@@ -46,7 +46,8 @@ document.getElementById('add-user-btn').addEventListener('click', () => {
     const name = userNameIn.value.trim();
     const pass = userPassIn.value.trim();
     if (!name || !pass) return alert("חובה להזין שם וסיסמה");
-    set(push(ref(db, 'users')), { name, password: pass });
+    // New users are active by default
+    set(push(ref(db, 'users')), { name, password: pass, active: true });
     userNameIn.value = ''; userPassIn.value = ''; userNameIn.focus();
 });
 
@@ -54,40 +55,68 @@ function renderUsersList() {
     const list = document.getElementById('users-list');
     list.innerHTML = '';
     if (!usersData) {
-        list.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-400">אין משתתפים רשומים</td></tr>';
+        list.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-400">אין משתתפים רשומים</td></tr>';
         return;
     }
 
+    // Add Header for Active column if not exists (Optional purely visual tweak)
+    // We just render rows here
+
     Object.keys(usersData).forEach(key => {
         const u = usersData[key];
+        const isActive = u.active !== false; // Default to true if undefined
+
         const row = document.createElement('tr');
         row.className = "hover:bg-gray-50 border-b last:border-0";
         
         row.innerHTML = `
-            <td class="p-3 font-bold text-gray-700">${u.name}</td>
             <td class="p-3">
                 <div class="flex items-center gap-2">
-                    <input type="text" class="pass-input border border-gray-300 rounded px-2 py-1 w-24 text-sm font-mono text-gray-600 focus:border-blue-500 focus:text-black outline-none transition" 
+                    <input type="text" class="name-input border border-gray-300 rounded px-2 py-1 w-20 text-sm font-bold text-gray-700 focus:border-blue-500 outline-none" 
+                           value="${u.name}" id="name-${key}">
+                    <button class="save-name-btn text-blue-500 hover:text-blue-700 bg-blue-50 p-1 rounded" data-id="${key}"><i data-feather="check" class="w-3 h-3"></i></button>
+                </div>
+            </td>
+            <td class="p-3">
+                <div class="flex items-center gap-2">
+                    <input type="text" class="pass-input border border-gray-300 rounded px-2 py-1 w-20 text-sm font-mono text-gray-600 focus:border-blue-500 outline-none" 
                            value="${u.password}" id="pass-${key}">
-                    <button class="save-pass-btn text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 p-1.5 rounded transition" 
-                            data-id="${key}" title="שמור סיסמה חדשה"><i data-feather="check" class="w-4 h-4"></i></button>
+                    <button class="save-pass-btn text-blue-500 hover:text-blue-700 bg-blue-50 p-1 rounded" data-id="${key}"><i data-feather="check" class="w-3 h-3"></i></button>
                 </div>
             </td>
             <td class="p-3 text-center">
-                <button class="del-usr text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded transition" data-id="${key}"><i data-feather="trash-2" class="w-4 h-4"></i></button>
+                <label class="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" class="active-toggle sr-only peer" data-id="${key}" ${isActive ? 'checked' : ''}>
+                    <div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                    <span class="ms-2 text-xs font-medium text-gray-600">${isActive ? 'פעיל' : 'לא פעיל'}</span>
+                </label>
+            </td>
+            <td class="p-3 text-center">
+                <button class="del-usr text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded" data-id="${key}" title="מחיקה (זהירות!)"><i data-feather="trash-2" class="w-4 h-4"></i></button>
             </td>`;
         list.appendChild(row);
     });
     feather.replace();
     
+    // Toggle Active Status
+    document.querySelectorAll('.active-toggle').forEach(input => input.addEventListener('change', e => {
+        update(ref(db, `users/${e.target.dataset.id}`), { active: e.target.checked });
+    }));
+
     document.querySelectorAll('.del-usr').forEach(btn => btn.addEventListener('click', e => {
-        if(confirm("למחוק את המשתמש?")) remove(ref(db, `users/${e.currentTarget.dataset.id}`));
+        if(confirm("שים לב! מחיקת משתמש תמחק אותו גם מההיסטוריה!\nעדיף להפוך אותו ל'לא פעיל'.\nהאם למחוק בכל זאת?")) remove(ref(db, `users/${e.currentTarget.dataset.id}`));
     }));
 
     document.querySelectorAll('.save-pass-btn').forEach(btn => btn.addEventListener('click', e => {
         const uid = e.currentTarget.dataset.id;
         const newPass = document.getElementById(`pass-${uid}`).value.trim();
         if(newPass) update(ref(db, `users/${uid}`), { password: newPass });
+    }));
+
+    document.querySelectorAll('.save-name-btn').forEach(btn => btn.addEventListener('click', e => {
+        const uid = e.currentTarget.dataset.id;
+        const newName = document.getElementById(`name-${uid}`).value.trim();
+        if(newName) update(ref(db, `users/${uid}`), { name: newName });
     }));
 }
 
@@ -141,7 +170,7 @@ function renderGamesList() {
 }
 
 // ------------------------------------------------------------------
-// 3. BONUS QUESTIONS (UPDATED WITH START BUTTON)
+// 3. BONUS QUESTIONS
 // ------------------------------------------------------------------
 const bonusInput = document.getElementById('bonus-question');
 const bonusList = document.getElementById('bonus-list');
@@ -149,7 +178,7 @@ const bonusList = document.getElementById('bonus-list');
 document.getElementById('add-bonus-btn').addEventListener('click', () => {
     const q = bonusInput.value.trim();
     if(!q) return;
-    set(push(ref(db, 'bonus_questions')), { question: q, started: false }); // Added started: false
+    set(push(ref(db, 'bonus_questions')), { question: q, started: false });
     bonusInput.value = ''; bonusInput.focus();
 });
 
@@ -163,8 +192,6 @@ function renderBonusList() {
         const item = bonusData[key];
         const div = document.createElement('div');
         div.className = "flex justify-between items-center bg-yellow-50/50 p-2 rounded border border-yellow-100";
-        
-        // Added Start Button Logic here
         div.innerHTML = `
             <div class="flex items-center gap-3">
                 <span class="font-bold text-gray-700 text-sm">${item.question}</span>
@@ -177,11 +204,9 @@ function renderBonusList() {
     });
     feather.replace();
     
-    // Listeners for Start Bonus
     document.querySelectorAll('.start-bonus').forEach(b => b.addEventListener('click', e => {
         update(ref(db, `bonus_questions/${e.currentTarget.dataset.id}`), { started: true });
     }));
-
     document.querySelectorAll('.del-bonus').forEach(b => b.addEventListener('click', e => {
         if(confirm("למחוק?")) {
             const id = e.currentTarget.dataset.id;
@@ -285,12 +310,25 @@ function renderHistoryList() {
         li.className = "flex justify-between items-center bg-white p-3 rounded shadow-sm border border-gray-100 hover:bg-gray-50";
         li.innerHTML = `
             <div><span class="font-bold text-gray-800 block">${item.name}</span><span class="text-xs text-gray-400">${date}</span></div>
-            <button class="del-hist text-red-400 hover:text-red-600 bg-red-50 p-2 rounded-full" data-id="${key}"><i data-feather="trash-2" class="w-4 h-4"></i></button>`;
+            <div class="flex gap-2">
+                <button class="edit-hist text-blue-400 hover:text-blue-600 bg-blue-50 p-2 rounded-full" data-id="${key}" data-name="${item.name}"><i data-feather="edit-2" class="w-4 h-4"></i></button>
+                <button class="del-hist text-red-400 hover:text-red-600 bg-red-50 p-2 rounded-full" data-id="${key}"><i data-feather="trash-2" class="w-4 h-4"></i></button>
+            </div>`;
         list.appendChild(li);
     });
     feather.replace();
+    
     document.querySelectorAll('.del-hist').forEach(b => b.addEventListener('click', e => {
         if(confirm("למחוק מההיסטוריה?")) remove(ref(db, `history/${e.currentTarget.dataset.id}`));
+    }));
+
+    document.querySelectorAll('.edit-hist').forEach(b => b.addEventListener('click', e => {
+        const id = e.currentTarget.dataset.id;
+        const oldName = e.currentTarget.dataset.name;
+        const newName = prompt("הזן שם חדש למחזור:", oldName);
+        if(newName && newName.trim() !== "") {
+            update(ref(db, `history/${id}`), { name: newName.trim() });
+        }
     }));
 }
 
