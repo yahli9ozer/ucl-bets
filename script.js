@@ -95,7 +95,7 @@ function renderAll() {
     
     // *** FILTER: ONLY ACTIVE USERS ***
     const sortedUsers = Object.keys(usersData)
-        .filter(key => usersData[key].active !== false) // Only show if active is true (or undefined)
+        .filter(key => usersData[key].active !== false)
         .map(key => ({
             id: key,
             name: usersData[key].name,
@@ -138,17 +138,17 @@ function renderGameBlock(gameId, game, sortedUsers) {
 
         if (isMe) {
             if (isStarted) {
-                cellContent = `<span class="bet-display font-bold text-gray-900 text-lg"></span>`;
+                cellContent = `<span class="bet-display font-bold text-lg"></span>`;
             } else {
                 cellContent = `
-                    <input type="number" class="my-bet-home w-8 text-center text-sm border border-blue-200 bg-blue-50 rounded p-1 text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="-">
+                    <input type="number" class="my-bet-home w-8 text-center text-sm border border-blue-200 bg-blue-50 rounded p-1 font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="-">
                     <span class="text-blue-300">:</span>
-                    <input type="number" class="my-bet-away w-8 text-center text-sm border border-blue-200 bg-blue-50 rounded p-1 text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="-">
+                    <input type="number" class="my-bet-away w-8 text-center text-sm border border-blue-200 bg-blue-50 rounded p-1 font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="-">
                 `;
             }
         } else {
             if (isStarted) {
-                cellContent = `<span class="bet-display font-bold text-gray-900"></span>`;
+                cellContent = `<span class="bet-display font-bold"></span>`;
             } else {
                 cellContent = `<span class="secret-icon"><i data-feather="lock" class="w-4 h-4 text-gray-300"></i></span>`;
                 cellClass = "bg-gray-50";
@@ -271,12 +271,12 @@ function renderBonusSection(sortedUsers) {
 }
 
 // -----------------------------------------------------------------------------
-// 4. SMART UPDATES (UPDATED: ALWAYS BLACK TEXT)
+// 4. SMART UPDATES (UPDATED: CONDITIONAL TEXT COLOR)
 // -----------------------------------------------------------------------------
 function recalculateAll() {
     // *** FILTER: ONLY ACTIVE USERS ***
     const sortedUsers = Object.keys(usersData)
-        .filter(key => usersData[key].active !== false) // Filter here too
+        .filter(key => usersData[key].active !== false)
         .map(key => ({
             id: key, 
             name: usersData[key].name,
@@ -338,14 +338,22 @@ function recalculateAll() {
                 }
             }
 
-            // CLEANUP: Reset to white background and BLACK text by default
-            cell.classList.remove('bg-green-700', 'bg-green-500', 'bg-green-400', 'bg-green-300', 'bg-red-200', 'bg-white', 'text-white', 'text-gray-900'); 
-            cell.classList.add('bg-white', 'text-gray-900'); 
+            // CLEANUP CLASS
+            cell.classList.remove('bg-green-700', 'bg-green-400', 'bg-green-200', 'bg-red-200', 'bg-white', 'text-white', 'text-gray-900'); 
+            
+            // --- NEW LOGIC: Text color depends on whether a Result exists ---
+            const hasResult = (isStarted && realScore && String(realScore.home).trim() !== '' && String(realScore.away).trim() !== '');
+            const textColorClass = hasResult ? 'text-gray-900' : 'text-white'; // Black if score exists, White if empty
+            
+            cell.classList.add('bg-white', textColorClass);
             
             const inputs = cell.querySelectorAll('input');
-            inputs.forEach(i => { i.classList.remove('text-white'); i.classList.add('text-gray-900'); });
+            inputs.forEach(i => { 
+                i.classList.remove('text-white', 'text-gray-900'); 
+                i.classList.add(textColorClass); 
+            });
 
-            if (isStarted && realScore && realScore.home !== '' && realScore.away !== '' && betHome !== '' && betAway !== '') {
+            if (hasResult && betHome !== '' && betAway !== '') {
                 const pts = getPoints(realScore.home, realScore.away, betHome, betAway);
                 
                 const userStat = leaderboard.find(u => u.id === uid);
@@ -357,17 +365,15 @@ function recalculateAll() {
 
                 if (isMe || isStarted) {
                     cell.classList.remove('bg-white');
+                    // We keep text-gray-900 (Black) as enforced above by hasResult
                     if (pts === 3) {
-                        // EXACT MATCH: Lightened Green + Black Text
-                        cell.classList.add('bg-green-400', 'text-gray-900');
+                        cell.classList.add('bg-green-400');
                     }
                     else if (pts === 1) {
-                        // DIRECTION: Light Green + Black Text
-                        cell.classList.add('bg-green-200', 'text-gray-900');
+                        cell.classList.add('bg-green-200');
                     }
                     else {
-                        // WRONG: Light Red + Black Text
-                        cell.classList.add('bg-red-200', 'text-gray-900');
+                        cell.classList.add('bg-red-200');
                     }
                 }
             } else if (!isMe && !isStarted) {
