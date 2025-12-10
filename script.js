@@ -138,7 +138,7 @@ function renderGameBlock(gameId, game, sortedUsers) {
 
         if (isMe) {
             if (isStarted) {
-                cellContent = `<span class="bet-display font-bold text-gray-800 text-lg"></span>`;
+                cellContent = `<span class="bet-display font-bold text-gray-900 text-lg"></span>`;
             } else {
                 cellContent = `
                     <input type="number" class="my-bet-home w-8 text-center text-sm border border-blue-200 bg-blue-50 rounded p-1 text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="-">
@@ -148,7 +148,7 @@ function renderGameBlock(gameId, game, sortedUsers) {
             }
         } else {
             if (isStarted) {
-                cellContent = `<span class="bet-display font-bold text-gray-800"></span>`;
+                cellContent = `<span class="bet-display font-bold text-gray-900"></span>`;
             } else {
                 cellContent = `<span class="secret-icon"><i data-feather="lock" class="w-4 h-4 text-gray-300"></i></span>`;
                 cellClass = "bg-gray-50";
@@ -271,7 +271,7 @@ function renderBonusSection(sortedUsers) {
 }
 
 // -----------------------------------------------------------------------------
-// 4. SMART UPDATES
+// 4. SMART UPDATES (UPDATED: ALWAYS BLACK TEXT)
 // -----------------------------------------------------------------------------
 function recalculateAll() {
     // *** FILTER: ONLY ACTIVE USERS ***
@@ -338,8 +338,9 @@ function recalculateAll() {
                 }
             }
 
-            cell.classList.remove('bg-green-700', 'bg-green-300', 'bg-red-200', 'bg-white', 'text-white'); 
-            cell.classList.add('bg-white'); 
+            // CLEANUP: Reset to white background and BLACK text by default
+            cell.classList.remove('bg-green-700', 'bg-green-500', 'bg-green-400', 'bg-green-300', 'bg-red-200', 'bg-white', 'text-white', 'text-gray-900'); 
+            cell.classList.add('bg-white', 'text-gray-900'); 
             
             const inputs = cell.querySelectorAll('input');
             inputs.forEach(i => { i.classList.remove('text-white'); i.classList.add('text-gray-900'); });
@@ -357,11 +358,17 @@ function recalculateAll() {
                 if (isMe || isStarted) {
                     cell.classList.remove('bg-white');
                     if (pts === 3) {
-                        cell.classList.add('bg-green-700', 'text-white');
-                        inputs.forEach(i => { i.classList.remove('text-gray-900'); i.classList.add('text-white'); });
+                        // EXACT MATCH: Lightened Green + Black Text
+                        cell.classList.add('bg-green-400', 'text-gray-900');
                     }
-                    else if (pts === 1) cell.classList.add('bg-green-300');
-                    else cell.classList.add('bg-red-200');
+                    else if (pts === 1) {
+                        // DIRECTION: Light Green + Black Text
+                        cell.classList.add('bg-green-200', 'text-gray-900');
+                    }
+                    else {
+                        // WRONG: Light Red + Black Text
+                        cell.classList.add('bg-red-200', 'text-gray-900');
+                    }
                 }
             } else if (!isMe && !isStarted) {
                 cell.classList.remove('bg-white');
