@@ -85,7 +85,7 @@ onValue(ref(db, 'bets'), (snapshot) => {
 
 
 // -----------------------------------------------------------------------------
-// 3. RENDERING (THE FIX IS HERE)
+// 3. RENDERING
 // -----------------------------------------------------------------------------
 function renderGameBlock(gameId, game) {
     const block = document.createElement('div');
@@ -108,7 +108,7 @@ function renderGameBlock(gameId, game) {
         `;
     });
 
-    // *** FIX: Added 'overflow-x-auto' wrapper and 'min-w-[800px]' to grid ***
+    // Contains the overflow-x-auto for mobile scrolling
     block.innerHTML = `
         <div class="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white sticky left-0 right-0">
             <h3 class="text-xl font-bold text-gray-800">${game.home} - ${game.away}</h3>
@@ -170,7 +170,7 @@ function renderGameBlock(gameId, game) {
 }
 
 // -----------------------------------------------------------------------------
-// 4. CALCULATIONS
+// 4. CALCULATIONS (Fixed Text Color)
 // -----------------------------------------------------------------------------
 function recalculateAll() {
     const leaderboard = {};
@@ -195,8 +195,11 @@ function recalculateAll() {
                 awayIn.value = betsData[gameId][player].away;
             }
 
-            cell.classList.remove('bg-green-700', 'bg-green-300', 'text-white', 'bg-white');
+            // RESET STYLES (Clean slate)
+            cell.classList.remove('bg-green-700', 'bg-green-300', 'bg-white', 'text-white'); // Removed text-white just in case
             cell.classList.add('bg-white'); 
+            
+            // Ensure inputs are black text
             homeIn.classList.remove('text-white');
             awayIn.classList.remove('text-white');
 
@@ -206,14 +209,15 @@ function recalculateAll() {
                 const bH = Number(homeIn.value);
                 const bA = Number(awayIn.value);
 
+                // EXACT SCORE (3 Points)
                 if (rH === bH && rA === bA) {
                     cell.classList.remove('bg-white');
-                    cell.classList.add('bg-green-700', 'text-white');
-                    homeIn.classList.add('text-white');
-                    awayIn.classList.add('text-white');
+                    cell.classList.add('bg-green-700'); // Green background, NO text-white
+                    // We DO NOT add text-white class to inputs anymore
                     leaderboard[player].points += 3;
                     leaderboard[player].exact += 1;
                 }
+                // CORRECT DIRECTION (1 Point)
                 else if (
                     (bH > bA && rH > rA) ||
                     (bH < bA && rH < rA) ||
