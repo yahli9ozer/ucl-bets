@@ -110,7 +110,7 @@ function renderAll() {
         renderBonusSection(sortedUsers);
     }
 
-    // 3. Calculate Leaderboard (Here is the update!)
+    // 3. Calculate Leaderboard
     calculateLeaderboard(sortedUsers);
     
     feather.replace();
@@ -284,7 +284,7 @@ function renderBonusSection(sortedUsers) {
 }
 
 // -----------------------------------------------------------------------------
-// 5. LEADERBOARD & CALC (UPDATED SORT LOGIC)
+// 5. LEADERBOARD & CALC
 // -----------------------------------------------------------------------------
 function getPoints(rH, rA, bH, bA) {
     if (rH === '' || rA === '' || bH === '' || bA === '') return 0;
@@ -326,12 +326,9 @@ function calculateLeaderboard(sortedUsers) {
         p.points += p.bonus;
     });
 
-    // *** UPDATED SORT: Points First -> Exact (Bullseye) Second ***
     leaderboard.sort((a, b) => {
-        if (b.points !== a.points) {
-            return b.points - a.points; // Primary sort by points
-        }
-        return b.exact - a.exact; // Secondary sort by 'Exact' count
+        if (b.points !== a.points) return b.points - a.points;
+        return b.exact - a.exact;
     });
 
     const tbody = document.getElementById('leaderboard-body');
@@ -360,7 +357,9 @@ function calculateLeaderboard(sortedUsers) {
                 ${p.name}
             </td>
             <td class="p-3 text-lg text-blue-600 font-bold">${p.points}</td>
-            <td class="p-3 text-sm text-green-700 font-normal bg-green-50 rounded">${p.exact}</td>
+            
+            <td class="p-3 text-sm text-green-700 font-bold">${p.exact}</td>
+            
             <td class="p-3 text-sm text-gray-500 font-normal">${p.direction}</td>
             <td class="p-3 flex items-center justify-center gap-1">
                 <button class="bonus-btn-minus bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-500 w-6 h-6 rounded text-xs" data-uid="${p.id}">-</button>
@@ -387,7 +386,7 @@ function updateBonus(uid, change) {
 }
 
 // -----------------------------------------------------------------------------
-// FALLING BACKGROUND ANIMATION
+// 6. FALLING BACKGROUND ANIMATION (The missing part!)
 // -----------------------------------------------------------------------------
 function createFallingBackground() {
     const container = document.getElementById('falling-elements-container');
@@ -395,46 +394,39 @@ function createFallingBackground() {
 
     // רשימת התמונות שייפלו (ודא שהן קיימות בתיקיית assets)
     const itemImages = [
-        'assets/item1.png', // למשל: חזייה כחולה
-        'assets/item2.png', // למשל: חזייה זהב
-        'assets/item3.png', // למשל: שטר דולר
-        'assets/item4.png'  // למשל: ערימת כסף
+        'assets/item1.png', 
+        'assets/item2.png', 
+        'assets/item3.png', 
+        'assets/item4.png' 
     ];
 
     function spawnItem() {
         const item = document.createElement('img');
         
-        // בחירה אקראית של תמונה
         const randomImg = itemImages[Math.floor(Math.random() * itemImages.length)];
         item.src = randomImg;
         item.classList.add('falling-item');
 
-        // הגדרות אקראיות למיקום, גודל ומהירות
-        const startLeft = Math.random() * 100; // מיקום אופקי באחוזים
-        const size = Math.random() * 30 + 20; // גודל בין 20 ל-50 פיקסלים
-        const duration = Math.random() * 5 + 5; // משך נפילה בין 5 ל-10 שניות
-        const delay = Math.random() * 5; // דיליי התחלתי
+        const startLeft = Math.random() * 100; 
+        const size = Math.random() * 30 + 20; 
+        const duration = Math.random() * 5 + 5; 
+        const delay = Math.random() * 5; 
 
         item.style.left = `${startLeft}%`;
         item.style.width = `${size}px`;
         item.style.height = 'auto';
         item.style.animationDuration = `${duration}s`;
-        item.style.animationDelay = `-${delay}s`; // התחלה מיידית בנקודה אקראית
+        item.style.animationDelay = `-${delay}s`; 
 
         container.appendChild(item);
 
-        // מחיקת האלמנט אחרי שהוא מסיים ליפול כדי לא להעמיס על הדפדפן
         setTimeout(() => {
             item.remove();
         }, (duration + delay) * 1000);
     }
 
-    // יצירת פריט חדש כל חצי שנייה
     setInterval(spawnItem, 500);
-    
-    // יצירה ראשונית של הרבה פריטים למילוי המסך
     for(let i=0; i<15; i++) spawnItem();
 }
 
-// הפעלת האנימציה בטעינת הדף
 document.addEventListener('DOMContentLoaded', createFallingBackground);
