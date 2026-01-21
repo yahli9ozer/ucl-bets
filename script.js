@@ -520,3 +520,33 @@ function createFallingBackground() {
 }
 
 document.addEventListener('DOMContentLoaded', createFallingBackground);
+
+document.addEventListener('DOMContentLoaded', () => {
+    // ... הקוד הקיים ...
+
+    // --- לוגיקה למוזיקת רקע ---
+    const music = document.getElementById('bg-music');
+    const musicBtn = document.getElementById('music-toggle');
+    let isPlaying = false;
+
+    // הגדרת ווליום נעים (לא צועק)
+    if(music) music.volume = 0.3; 
+
+    if (musicBtn && music) {
+        musicBtn.addEventListener('click', () => {
+            if (isPlaying) {
+                music.pause();
+                musicBtn.innerHTML = `<i data-feather="volume-x" class="w-6 h-6"></i>`;
+                musicBtn.classList.remove('text-blue-600', 'animate-pulse');
+                musicBtn.classList.add('text-gray-600');
+            } else {
+                music.play().catch(e => console.log("Audio play failed", e));
+                musicBtn.innerHTML = `<i data-feather="music" class="w-6 h-6"></i>`;
+                musicBtn.classList.remove('text-gray-600');
+                musicBtn.classList.add('text-blue-600', 'animate-pulse'); // אפקט פעימה כשהמוזיקה מנגנת
+            }
+            feather.replace(); // ריענון האייקון
+            isPlaying = !isPlaying;
+        });
+    }
+});
