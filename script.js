@@ -36,7 +36,7 @@ const container = document.getElementById('matches-container');
 // -----------------------------------------------------------------------------
 onValue(ref(db, 'users'), (snapshot) => {
     usersData = snapshot.val() || {};
-    // אם המשתמש מחובר, נעדכן את התצוגה שלו (למקרה ששינה כינוי) ואת שאר האפליקציה
+    // אם המשתמש מחובר, נעדכן את התצוגה שלו
     if (currentUser) {
         updateHeaderDisplay();
         renderAll();
@@ -65,7 +65,7 @@ function attemptLogin() {
         loginScreen.classList.add('hidden');
         appContent.classList.remove('hidden');
         
-        updateHeaderDisplay(); // עדכון השם והכינוי בכותרת
+        updateHeaderDisplay(); // עדכון ראשוני של הכותרת
         startAppListeners();
     } else {
         loginError.innerText = "שם משתמש או סיסמה שגויים";
@@ -78,35 +78,60 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 });
 
 // --- NEW: Nickname Edit Logic ---
-const editNickBtn = document.getElementById('edit-nickname-btn');
-if (editNickBtn) {
-    editNickBtn.addEventListener('click', () => {
-        if (!currentUser) return;
-        
-        // שליפת הכינוי הנוכחי (אם יש)
-        const currentData = usersData[currentUser.key];
-        const currentNick = currentData.nickname || "";
-        
-        const newNick = prompt("הזן כינוי חדש (למשל: המנחש, הקוסם):", currentNick);
-        
-        if (newNick !== null) {
-            // עדכון בפיירבייס
-            update(ref(db, `users/${currentUser.key}`), { nickname: newNick.trim() });
-        }
-    });
-}
+// שימוש ב-DOMContentLoaded כדי לוודא שהכפתור קיים
+document.addEventListener('DOMContentLoaded', () => {
+    const editNickBtn = document.getElementById('edit-nickname-btn');
+    if (editNickBtn) {
+        editNickBtn.addEventListener('click', () => {
+            if (!currentUser) return;
+            
+            // שליפת הכינוי הנוכחי (אם יש)
+            const currentData = usersData[currentUser.key];
+            const currentNick = currentData.nickname || "";
+            
+            // ההודעה ב-prompt מדגישה שבוחרים רק כינוי
+            const newNick = prompt("בחר כינוי שיופיע ליד השם שלך (למשל: המנחש, הקוסם):", currentNick);
+            
+            if (newNick !== null) {
+                // עדכון בפיירבייס - מעדכן רק את ה-nickname, לא את ה-name
+                update(ref(db, `users/${currentUser.key}`), { nickname: newNick.trim() });
+            }
+        });
+    }
+});
 
+// פונקציה שדואגת לתצוגה של "הוסף כינוי" או הצגת הכינוי הקיים
 function updateHeaderDisplay() {
     if (!currentUser || !usersData[currentUser.key]) return;
     
     const u = usersData[currentUser.key];
     const displayEl = document.getElementById('display-username');
+    const editBtn = document.getElementById('edit-nickname-btn');
     
+    // 1. טיפול בשם ובכינוי
     if (u.nickname && u.nickname.trim() !== "") {
+        // אם יש כינוי: מציגים את השם + הכינוי בתוך גרשיים
         displayEl.innerHTML = `${u.name} <span class="text-blue-600">"${u.nickname}"</span>`;
+        
+        // הכפתור הופך לאייקון עריכה קטן (כי כבר יש כינוי)
+        if(editBtn) {
+            editBtn.innerHTML = `<i data-feather="edit-2" class="w-4 h-4"></i>`;
+            editBtn.classList.remove('bg-blue-100', 'px-2', 'py-1', 'text-xs'); // מנקים עיצוב כפתור
+            editBtn.classList.add('p-1', 'hover:bg-blue-50'); // מחזירים עיצוב אייקון
+        }
     } else {
+        // אם אין כינוי: מציגים רק את השם
         displayEl.innerText = u.name;
+        
+        // הכפתור הופך לטקסט בולט "הוסף כינוי"
+        if(editBtn) {
+            editBtn.innerHTML = `<span class="text-xs font-bold bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200 transition flex items-center gap-1">+ הוסף כינוי</span>`;
+            editBtn.classList.remove('p-1', 'hover:bg-blue-50'); // מנקים עיצוב אייקון
+        }
     }
+    
+    // רענון האייקונים (במקרה שהחלפנו לאייקון עריכה)
+    feather.replace();
 }
 
 
@@ -131,20 +156,19 @@ function renderAll() {
     container.innerHTML = '';
     
     // *** FILTER: ONLY ACTIVE USERS ***
-    // כאן אנחנו גם בונים את "שם התצוגה" המלא עם הכינוי
     const sortedUsers = Object.keys(usersData)
         .filter(key => usersData[key].active !== false)
         .map(key => {
             const u = usersData[key];
-            // יצירת שם מלא: שם + "כינוי"
+            // יצירת שם מלא לטבלאות: שם + "כינוי"
             const fullName = u.nickname 
                 ? `${u.name} "${u.nickname}"` 
                 : u.name;
 
             return {
                 id: key,
-                name: fullName, // משתמשים בזה בטבלאות
-                originalName: u.name, // למקרה שנצטרך מיון לפי שם מקורי
+                name: fullName, 
+                originalName: u.name, 
                 bonusPoints: u.bonusPoints || 0
             };
         }).sort((a, b) => a.originalName.localeCompare(b.originalName));
@@ -174,7 +198,6 @@ function renderGameBlock(gameId, game, sortedUsers) {
     sortedUsers.forEach(u => {
         const isMe = (u.id === currentUser.key);
         const bgClass = isMe ? 'bg-blue-50 text-blue-800' : 'bg-gray-50 text-gray-600';
-        // שימוש ב-u.name שכבר כולל את הכינוי מהפונקציה renderAll
         headerHTML += `<div class="p-2 border-r border-b border-gray-200 text-center font-bold text-xs sm:text-sm whitespace-nowrap ${bgClass}">${u.name}</div>`;
     });
 
@@ -323,7 +346,6 @@ function renderBonusSection(sortedUsers) {
 // -----------------------------------------------------------------------------
 function recalculateAll() {
     // *** FILTER: ONLY ACTIVE USERS ***
-    // גם כאן אנחנו בונים את השם המלא עם הכינוי כדי שהטבלה תתעדכן
     const sortedUsers = Object.keys(usersData)
         .filter(key => usersData[key].active !== false)
         .map(key => {
