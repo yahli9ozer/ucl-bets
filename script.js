@@ -36,7 +36,11 @@ const container = document.getElementById('matches-container');
 // -----------------------------------------------------------------------------
 onValue(ref(db, 'users'), (snapshot) => {
     usersData = snapshot.val() || {};
-    if (currentUser) renderAll();
+    // אם המשתמש מחובר, נעדכן את התצוגה שלו (למקרה ששינה כינוי) ואת שאר האפליקציה
+    if (currentUser) {
+        updateHeaderDisplay();
+        renderAll();
+    }
 });
 
 loginBtn.addEventListener('click', attemptLogin);
@@ -60,7 +64,8 @@ function attemptLogin() {
         currentUser = { key: foundUserKey, name: foundUserName };
         loginScreen.classList.add('hidden');
         appContent.classList.remove('hidden');
-        document.getElementById('display-username').innerText = foundUserName;
+        
+        updateHeaderDisplay(); // עדכון השם והכינוי בכותרת
         startAppListeners();
     } else {
         loginError.innerText = "שם משתמש או סיסמה שגויים";
@@ -71,6 +76,38 @@ function attemptLogin() {
 document.getElementById('logout-btn').addEventListener('click', () => {
     location.reload();
 });
+
+// --- NEW: Nickname Edit Logic ---
+const editNickBtn = document.getElementById('edit-nickname-btn');
+if (editNickBtn) {
+    editNickBtn.addEventListener('click', () => {
+        if (!currentUser) return;
+        
+        // שליפת הכינוי הנוכחי (אם יש)
+        const currentData = usersData[currentUser.key];
+        const currentNick = currentData.nickname || "";
+        
+        const newNick = prompt("הזן כינוי חדש (למשל: המנחש, הקוסם):", currentNick);
+        
+        if (newNick !== null) {
+            // עדכון בפיירבייס
+            update(ref(db, `users/${currentUser.key}`), { nickname: newNick.trim() });
+        }
+    });
+}
+
+function updateHeaderDisplay() {
+    if (!currentUser || !usersData[currentUser.key]) return;
+    
+    const u = usersData[currentUser.key];
+    const displayEl = document.getElementById('display-username');
+    
+    if (u.nickname && u.nickname.trim() !== "") {
+        displayEl.innerHTML = `${u.name} <span class="text-blue-600">"${u.nickname}"</span>`;
+    } else {
+        displayEl.innerText = u.name;
+    }
+}
 
 
 // -----------------------------------------------------------------------------
@@ -94,13 +131,23 @@ function renderAll() {
     container.innerHTML = '';
     
     // *** FILTER: ONLY ACTIVE USERS ***
+    // כאן אנחנו גם בונים את "שם התצוגה" המלא עם הכינוי
     const sortedUsers = Object.keys(usersData)
         .filter(key => usersData[key].active !== false)
-        .map(key => ({
-            id: key,
-            name: usersData[key].name,
-            bonusPoints: usersData[key].bonusPoints || 0
-        })).sort((a, b) => a.name.localeCompare(b.name));
+        .map(key => {
+            const u = usersData[key];
+            // יצירת שם מלא: שם + "כינוי"
+            const fullName = u.nickname 
+                ? `${u.name} "${u.nickname}"` 
+                : u.name;
+
+            return {
+                id: key,
+                name: fullName, // משתמשים בזה בטבלאות
+                originalName: u.name, // למקרה שנצטרך מיון לפי שם מקורי
+                bonusPoints: u.bonusPoints || 0
+            };
+        }).sort((a, b) => a.originalName.localeCompare(b.originalName));
 
     if (gamesData) {
         Object.keys(gamesData).forEach(gameId => {
@@ -127,6 +174,7 @@ function renderGameBlock(gameId, game, sortedUsers) {
     sortedUsers.forEach(u => {
         const isMe = (u.id === currentUser.key);
         const bgClass = isMe ? 'bg-blue-50 text-blue-800' : 'bg-gray-50 text-gray-600';
+        // שימוש ב-u.name שכבר כולל את הכינוי מהפונקציה renderAll
         headerHTML += `<div class="p-2 border-r border-b border-gray-200 text-center font-bold text-xs sm:text-sm whitespace-nowrap ${bgClass}">${u.name}</div>`;
     });
 
@@ -271,17 +319,26 @@ function renderBonusSection(sortedUsers) {
 }
 
 // -----------------------------------------------------------------------------
-// 4. SMART UPDATES (UPDATED: CONDITIONAL TEXT COLOR)
+// 4. SMART UPDATES
 // -----------------------------------------------------------------------------
 function recalculateAll() {
     // *** FILTER: ONLY ACTIVE USERS ***
+    // גם כאן אנחנו בונים את השם המלא עם הכינוי כדי שהטבלה תתעדכן
     const sortedUsers = Object.keys(usersData)
         .filter(key => usersData[key].active !== false)
-        .map(key => ({
-            id: key, 
-            name: usersData[key].name,
-            bonusPoints: usersData[key].bonusPoints || 0
-        })).sort((a, b) => a.name.localeCompare(b.name));
+        .map(key => {
+            const u = usersData[key];
+            const fullName = u.nickname 
+                ? `${u.name} "${u.nickname}"` 
+                : u.name;
+
+            return {
+                id: key, 
+                name: fullName,
+                originalName: u.name,
+                bonusPoints: u.bonusPoints || 0
+            };
+        }).sort((a, b) => a.originalName.localeCompare(b.originalName));
 
     const leaderboard = sortedUsers.map(u => ({ 
         id: u.id, name: u.name, points: 0, exact: 0, direction: 0, bonus: u.bonusPoints 
@@ -341,9 +398,9 @@ function recalculateAll() {
             // CLEANUP CLASS
             cell.classList.remove('bg-green-700', 'bg-green-400', 'bg-green-200', 'bg-red-200', 'bg-white', 'text-white', 'text-gray-900'); 
             
-            // --- NEW LOGIC: Text color depends on whether a Result exists ---
+            // Text color logic
             const hasResult = (isStarted && realScore && String(realScore.home).trim() !== '' && String(realScore.away).trim() !== '');
-            const textColorClass = hasResult ? 'text-gray-900' : 'text-white'; // Black if score exists, White if empty
+            const textColorClass = hasResult ? 'text-gray-900' : 'text-white'; 
             
             cell.classList.add('bg-white', textColorClass);
             
@@ -365,7 +422,6 @@ function recalculateAll() {
 
                 if (isMe || isStarted) {
                     cell.classList.remove('bg-white');
-                    // We keep text-gray-900 (Black) as enforced above by hasResult
                     if (pts === 3) {
                         cell.classList.add('bg-green-600');
                     }
