@@ -36,11 +36,7 @@ const container = document.getElementById('matches-container');
 // -----------------------------------------------------------------------------
 onValue(ref(db, 'users'), (snapshot) => {
     usersData = snapshot.val() || {};
-    // אם המשתמש מחובר, נעדכן את התצוגה שלו
-    if (currentUser) {
-        updateHeaderDisplay();
-        renderAll();
-    }
+    if (currentUser) renderAll();
 });
 
 loginBtn.addEventListener('click', attemptLogin);
@@ -64,8 +60,7 @@ function attemptLogin() {
         currentUser = { key: foundUserKey, name: foundUserName };
         loginScreen.classList.add('hidden');
         appContent.classList.remove('hidden');
-        
-        updateHeaderDisplay(); // עדכון ראשוני של הכותרת
+        document.getElementById('display-username').innerText = foundUserName;
         startAppListeners();
     } else {
         loginError.innerText = "שם משתמש או סיסמה שגויים";
@@ -76,63 +71,6 @@ function attemptLogin() {
 document.getElementById('logout-btn').addEventListener('click', () => {
     location.reload();
 });
-
-// --- NEW: Nickname Edit Logic ---
-// שימוש ב-DOMContentLoaded כדי לוודא שהכפתור קיים
-document.addEventListener('DOMContentLoaded', () => {
-    const editNickBtn = document.getElementById('edit-nickname-btn');
-    if (editNickBtn) {
-        editNickBtn.addEventListener('click', () => {
-            if (!currentUser) return;
-            
-            // שליפת הכינוי הנוכחי (אם יש)
-            const currentData = usersData[currentUser.key];
-            const currentNick = currentData.nickname || "";
-            
-            // ההודעה ב-prompt מדגישה שבוחרים רק כינוי
-            const newNick = prompt("בחר כינוי שיופיע ליד השם שלך (למשל: המנחש, הקוסם):", currentNick);
-            
-            if (newNick !== null) {
-                // עדכון בפיירבייס - מעדכן רק את ה-nickname, לא את ה-name
-                update(ref(db, `users/${currentUser.key}`), { nickname: newNick.trim() });
-            }
-        });
-    }
-});
-
-// פונקציה שדואגת לתצוגה של "הוסף כינוי" או הצגת הכינוי הקיים
-function updateHeaderDisplay() {
-    if (!currentUser || !usersData[currentUser.key]) return;
-    
-    const u = usersData[currentUser.key];
-    const displayEl = document.getElementById('display-username');
-    const editBtn = document.getElementById('edit-nickname-btn');
-    
-    // 1. טיפול בשם ובכינוי
-    if (u.nickname && u.nickname.trim() !== "") {
-        // אם יש כינוי: מציגים את השם + הכינוי בתוך גרשיים
-        displayEl.innerHTML = `${u.name} <span class="text-blue-600">"${u.nickname}"</span>`;
-        
-        // הכפתור הופך לאייקון עריכה קטן (כי כבר יש כינוי)
-        if(editBtn) {
-            editBtn.innerHTML = `<i data-feather="edit-2" class="w-4 h-4"></i>`;
-            editBtn.classList.remove('bg-blue-100', 'px-2', 'py-1', 'text-xs'); // מנקים עיצוב כפתור
-            editBtn.classList.add('p-1', 'hover:bg-blue-50'); // מחזירים עיצוב אייקון
-        }
-    } else {
-        // אם אין כינוי: מציגים רק את השם
-        displayEl.innerText = u.name;
-        
-        // הכפתור הופך לטקסט בולט "הוסף כינוי"
-        if(editBtn) {
-            editBtn.innerHTML = `<span class="text-xs font-bold bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200 transition flex items-center gap-1">+ הוסף כינוי</span>`;
-            editBtn.classList.remove('p-1', 'hover:bg-blue-50'); // מנקים עיצוב אייקון
-        }
-    }
-    
-    // רענון האייקונים (במקרה שהחלפנו לאייקון עריכה)
-    feather.replace();
-}
 
 
 // -----------------------------------------------------------------------------
@@ -158,20 +96,11 @@ function renderAll() {
     // *** FILTER: ONLY ACTIVE USERS ***
     const sortedUsers = Object.keys(usersData)
         .filter(key => usersData[key].active !== false)
-        .map(key => {
-            const u = usersData[key];
-            // יצירת שם מלא לטבלאות: שם + "כינוי"
-            const fullName = u.nickname 
-                ? `${u.name} "${u.nickname}"` 
-                : u.name;
-
-            return {
-                id: key,
-                name: fullName, 
-                originalName: u.name, 
-                bonusPoints: u.bonusPoints || 0
-            };
-        }).sort((a, b) => a.originalName.localeCompare(b.originalName));
+        .map(key => ({
+            id: key,
+            name: usersData[key].name,
+            bonusPoints: usersData[key].bonusPoints || 0
+        })).sort((a, b) => a.name.localeCompare(b.name));
 
     if (gamesData) {
         Object.keys(gamesData).forEach(gameId => {
@@ -348,19 +277,11 @@ function recalculateAll() {
     // *** FILTER: ONLY ACTIVE USERS ***
     const sortedUsers = Object.keys(usersData)
         .filter(key => usersData[key].active !== false)
-        .map(key => {
-            const u = usersData[key];
-            const fullName = u.nickname 
-                ? `${u.name} "${u.nickname}"` 
-                : u.name;
-
-            return {
-                id: key, 
-                name: fullName,
-                originalName: u.name,
-                bonusPoints: u.bonusPoints || 0
-            };
-        }).sort((a, b) => a.originalName.localeCompare(b.originalName));
+        .map(key => ({
+            id: key, 
+            name: usersData[key].name,
+            bonusPoints: usersData[key].bonusPoints || 0
+        })).sort((a, b) => a.name.localeCompare(b.name));
 
     const leaderboard = sortedUsers.map(u => ({ 
         id: u.id, name: u.name, points: 0, exact: 0, direction: 0, bonus: u.bonusPoints 
