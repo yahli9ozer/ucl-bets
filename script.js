@@ -17,13 +17,12 @@ const db = getDatabase(app);
 
 // State
 let currentUser = null; 
-let usersData = {};     
+let usersData = {};      
 let gamesData = {};
 let scoresData = {};
 let betsData = {};
 let bonusQuestions = {};
 let bonusBets = {};
-let isMusicPlaying = false; // משתנה למעקב אחרי המוזיקה
 
 // DOM Elements
 const loginScreen = document.getElementById('login-screen');
@@ -63,28 +62,7 @@ function attemptLogin() {
         appContent.classList.remove('hidden');
         document.getElementById('display-username').innerText = foundUserName;
         
-        // --- מוזיקה: הפעלה אוטומטית בעת התחברות ---
-        const music = document.getElementById('bg-music');
-        const musicBtn = document.getElementById('music-toggle');
-        
-        if (music) {
-            music.volume = 0.3; // ווליום התחלתי נעים
-            music.play().then(() => {
-                // אם הניגון הצליח
-                isMusicPlaying = true;
-                if (musicBtn) {
-                    musicBtn.classList.remove('hidden'); // מציג את הכפתור
-                    musicBtn.classList.add('text-blue-600', 'animate-pulse');
-                    musicBtn.innerHTML = `<i data-feather="music" class="w-6 h-6"></i>`;
-                    feather.replace();
-                }
-            }).catch(e => {
-                console.log("Autoplay prevented:", e);
-                // במקרה שהדפדפן בכל זאת חסם, נציג את כפתור ההפעלה במצב כבוי
-                if (musicBtn) musicBtn.classList.remove('hidden');
-            });
-        }
-
+        // כפתור המוזיקה הוסר מכאן
         startAppListeners();
     } else {
         loginError.innerText = "שם משתמש או סיסמה שגויים";
@@ -96,29 +74,7 @@ document.getElementById('logout-btn').addEventListener('click', () => {
     location.reload();
 });
 
-// שליטה במוזיקה (כפתור השתקה/הפעלה)
-const musicToggleBtn = document.getElementById('music-toggle');
-if (musicToggleBtn) {
-    musicToggleBtn.addEventListener('click', () => {
-        const music = document.getElementById('bg-music');
-        if (!music) return;
-
-        if (isMusicPlaying) {
-            music.pause();
-            musicToggleBtn.innerHTML = `<i data-feather="volume-x" class="w-6 h-6"></i>`;
-            musicToggleBtn.classList.remove('text-blue-600', 'animate-pulse');
-            musicToggleBtn.classList.add('text-gray-600');
-        } else {
-            music.play();
-            musicToggleBtn.innerHTML = `<i data-feather="music" class="w-6 h-6"></i>`;
-            musicToggleBtn.classList.remove('text-gray-600');
-            musicToggleBtn.classList.add('text-blue-600', 'animate-pulse');
-        }
-        feather.replace();
-        isMusicPlaying = !isMusicPlaying;
-    });
-}
-
+// לוגיקת musicToggleBtn הוסרה מכאן
 
 // -----------------------------------------------------------------------------
 // 2. DATA LISTENERS
