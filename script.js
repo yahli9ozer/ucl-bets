@@ -64,7 +64,7 @@ function attemptLogin() {
         document.getElementById('display-username').innerText = foundUserName;
         
         // --- מוזיקה: הפעלה אוטומטית בעת התחברות ---
-        /* const music = document.getElementById('bg-music');
+        const music = document.getElementById('bg-music');
         const musicBtn = document.getElementById('music-toggle');
         
         if (music) {
@@ -117,7 +117,7 @@ if (musicToggleBtn) {
         feather.replace();
         isMusicPlaying = !isMusicPlaying;
     });
-}*/
+}
 
 
 // -----------------------------------------------------------------------------
